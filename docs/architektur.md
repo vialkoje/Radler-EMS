@@ -30,11 +30,11 @@ geben einheitliche Befehle. Der Adapter übersetzt in beide Richtungen ([Geräte
 |---|---|---|
 | ⚙️ System | Start, Messwerte → Prozessabbild, InfluxDB schreiben, Logeintrag erzeugen, Geräte-Wächter, Tagesbericht | – |
 | ⚡ EMS | Lastprofil, Strategie, Ausführung | 1 h, 15 min, 10 s |
-| ☀️ PV & Netz | Adapter PV-Wechselrichter, Adapter Netzzähler | 10 s |
+| ☀️ PV & Netz | Adapter PV-Wechselrichter, Adapter Balkonkraftwerk, Adapter Netzzähler | 10 s |
 | 🔋 PV-Batterie | Befehl Batterie, Adapter Batterie | 10 s |
 | 🚗 Auto | Ladeplanung (mit Befehl), Adapter Wallbox, Adapter Auto-Ladestand, Ladestand von Hand | 1 min |
 | 🌡️ Wärmepumpe | Steuerung (mit Befehl), Adapter Wärmepumpe | 1 min |
-| 💶 Preise & Prognose | Strompreise, PV-Prognose, Wetter | 1 h, 1 h, 10 min |
+| 💶 Preise & Prognose | Strompreise, PV-Prognose, Wetter | 15 min, 30 min, 10 min |
 | 🧪 Simulator | Simulator | 10 s |
 
 Jede Gruppe hat oben einen Kommentar, jeder Funktionsknoten einen Kopf mit Zweck, Eingang, Ausgängen, Kontext und
@@ -55,14 +55,15 @@ Grenze des Lesers, gilt als fehlend. Die Regel verhält sich dann so, wie ihr Ko
 | Signal | Vorzeichen / Werte | Quelle |
 |---|---|---|
 | `pv.leistung_W` | ≥ 0 | Adapter PV |
+| `bkw.leistung_W` (optional `bkw.soc_pct`) | ≥ 0, AC-Abgabe des Balkonkraftwerks | Adapter Balkonkraftwerk (nur mit `BKW_QUELLE` ≠ aus) |
 | `netz.bezug_W` | **> 0 Bezug, < 0 Einspeisung** | Adapter Netz |
 | `batterie.soc_pct`, `batterie.leistung_W` | leistung **> 0 Entladen, < 0 Laden** | Adapter Batterie |
 | `wallbox.leistung_W`, `wallbox.status`, `wallbox.ampere` | status `getrennt`, `angesteckt`, `laedt`, `pausiert`, `stoerung` | Adapter Wallbox |
 | `auto.soc_pct` | 0–100 | Adapter Auto oder von Hand (`/radler/auto?soc=`) |
 | `wp.leistung_W`, `wp.status`, `wp.aussen_C`, `wp.raum_C` | status `aus`, `heizen`, `warmwasser`, `stoerung` | Adapter WP |
-| `haus.verbrauch_W`, `haus.ohne_auto_W`, `haus.grundlast_W` | Bilanz: Netz + PV + Batterie (− Auto, − WP) | Prozessabbild, bei jedem Netzwert |
+| `haus.verbrauch_W`, `haus.ohne_auto_W`, `haus.grundlast_W` | Bilanz: Netz + PV + Balkonkraftwerk + Batterie (− Auto, − WP) | Prozessabbild, bei jedem Netzwert |
 | `markt.preise`, `markt.preise_15`, `markt.preis_jetzt_ct` | Endpreis in ct/kWh (Börse + `ABGABEN_CT`) | Strompreise |
-| `prognose.pv` | `[{ t, W }]` je Stunde (t = Beginn) | PV-Prognose |
+| `prognose.pv`, `prognose.pv_anlage`, `prognose.bkw` | `[{ t, W }]` je Stunde (t = Beginn); `pv` = Anlage + Balkonkraftwerk (gekappt auf `BKW_MAX_W`) | PV-Prognose |
 | `wetter.temperatur_C` … | | Wetter |
 | `befehl.batterie`, `befehl.wallbox`, `befehl.wp` | letzter Befehl (zur Anzeige) | Befehl verteilen |
 
@@ -81,7 +82,7 @@ Weitere globale Werte, die Regeln einander geben:
 | `befehl_batterie`, `befehl_wallbox`, `befehl_wp` | Befehl verteilen | Simulator |
 
 Das Abbild liegt nur im Arbeitsspeicher. Nach einem Neustart ist es nach etwa 10 s (Geräte) bzw. 5 s (Preise,
-Prognose) wieder gefüllt; die Regeln starten deshalb erst 25–45 s nach dem Start.
+Prognose: erster Abruf 30–35 s nach dem Start, weil Netz und DNS nach dem Booten etwas brauchen) wieder gefüllt; die Strategie läuft erst nach 60 s.
 
 ## Modi
 

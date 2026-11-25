@@ -4,13 +4,16 @@
 // ─ Umgebung: STANDORT_LAT, STANDORT_LON,
 //             PV_FLAECHEN = "Neigung/Azimut/kWp;…", Azimut wie Open-Meteo: 0 = Süd, -90 = Ost, 90 = West
 //             Beispiel: "35/-90/4.5;35/90/4.5" (Ost-West-Dach mit je 4,5 kWp). Standard: "30/0/8"
+//             BKW_FLAECHEN wie PV_FLAECHEN für das Balkonkraftwerk (nur wenn BKW_QUELLE ≠ aus), z. B. "90/0/0.8"
 
 const lat = parseFloat(env.get('STANDORT_LAT')) || 51.16; // ohne Einstellung: Mitte Deutschlands (Warnung beim Start)
 const lon = parseFloat(env.get('STANDORT_LON')) || 10.45;
-const flaechen = String(env.get('PV_FLAECHEN') || '30/0/8').split(';')
+const lesen = (text, art) => String(text || '').split(';')
     .map(s => s.trim()).filter(Boolean)
-    .map(s => { const [neigung, azimut, kwp] = s.split('/').map(parseFloat); return { neigung, azimut, kwp }; })
+    .map(s => { const [neigung, azimut, kwp] = s.split('/').map(parseFloat); return { neigung, azimut, kwp, art }; })
     .filter(f => [f.neigung, f.azimut, f.kwp].every(x => !isNaN(x)));
+const flaechen = lesen(env.get('PV_FLAECHEN') || '30/0/8', 'anlage')
+    .concat((env.get('BKW_QUELLE') || 'aus') !== 'aus' ? lesen(env.get('BKW_FLAECHEN'), 'bkw') : []);
 if (!flaechen.length) {
     node.status({ fill: 'red', shape: 'dot', text: 'PV_FLAECHEN ungültig' });
     return null;

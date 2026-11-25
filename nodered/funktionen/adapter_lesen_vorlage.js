@@ -7,6 +7,7 @@
 //   msg.quelle = 'geraet'
 //   msg.payload = { … } mit genau diesen Feldern (fehlende weglassen):
 //     pv:       { leistung_W }                                   (≥ 0)
+//     bkw:      { leistung_W, soc_pct? }                         Balkonkraftwerk: AC-Abgabe ≥ 0, Akku-SoC falls vorhanden
 //     netz:     { bezug_W }                                      (> 0 Bezug, < 0 Einspeisung)
 //     batterie: { soc_pct, leistung_W }                          (leistung_W > 0 Entladen, < 0 Laden)
 //     wallbox:  { leistung_W, status, ampere }                   status: getrennt | angesteckt | laedt | pausiert | stoerung
@@ -15,7 +16,7 @@
 //
 // Solange <GERÄT>_QUELLE nicht "geraet" ist, tut dieser Knoten nichts.
 
-const QUELLE_VAR = { pv: 'PV_QUELLE', netz: 'NETZ_QUELLE', batterie: 'BATTERIE_QUELLE', wallbox: 'WALLBOX_QUELLE',
+const QUELLE_VAR = { pv: 'PV_QUELLE', bkw: 'BKW_QUELLE', netz: 'NETZ_QUELLE', batterie: 'BATTERIE_QUELLE', wallbox: 'WALLBOX_QUELLE',
     auto: 'AUTO_QUELLE', wp: 'WP_QUELLE' }[GERAET];
 if ((env.get(QUELLE_VAR) || 'simulator') !== 'geraet') {
     node.status({ fill: 'grey', shape: 'ring', text: 'nicht aktiv (' + QUELLE_VAR + ' ≠ geraet)' });

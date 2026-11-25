@@ -6,7 +6,7 @@
 // ─ Ausgang 1: msg.payload = InfluxDB-Punkte für den Batch-Knoten.
 // ─ Kontext: global.abbild = { 'geraet.feld': { wert, einheit, zeit, quelle } }
 // Kommt ein Netzwert, rechnet der Knoten die Hausbilanz (Messreihe "haus"):
-//   verbrauch = Netzbezug + PV + Batterie-Entladung (alle Vorzeichen siehe docs/architektur.md)
+//   verbrauch = Netzbezug + PV + Balkonkraftwerk + Batterie-Entladung (alle Vorzeichen siehe docs/architektur.md)
 
 const EINHEITEN = [['_kWh', 'kWh'], ['_Wh', 'Wh'], ['_W', 'W'], ['_pct', '%'], ['_C', '°C'], ['_K', 'K'], ['_A', 'A']];
 function einheit(feld) {
@@ -38,7 +38,7 @@ const punkte = [{ measurement: geraet, tags: { quelle }, fields, timestamp: new 
 if (geraet === 'netz' && typeof fields.bezug_W === 'number') {
     // Hausbilanz: Werte höchstens 60 s alt, fehlende Geräte zählen als 0
     const g = s => { const e = abbild[s]; return e && zeit - e.zeit <= 60000 && typeof e.wert === 'number' ? e.wert : 0; };
-    const verbrauch = Math.max(0, fields.bezug_W + g('pv.leistung_W') + g('batterie.leistung_W'));
+    const verbrauch = Math.max(0, fields.bezug_W + g('pv.leistung_W') + g('bkw.leistung_W') + g('batterie.leistung_W'));
     const ohneAuto = Math.max(0, verbrauch - g('wallbox.leistung_W'));
     const haus = {
         verbrauch_W: Math.round(verbrauch),

@@ -31,7 +31,7 @@ Wechselrichter). Das EMS greift nur ein, wenn es etwas Besseres weiß: Netzladen
 Die Strategie fragt nicht „Ist der Strom jetzt günstig?“, sondern **„Fehlt dem Akku Energie, bevor der Strom wieder
 billiger wird?“** (in Haus-EMS seit 9.11.2026, dort in einer Jahressimulation 10 € im Jahr besser als die Schwellenregel).
 
-1. Akkuinhalt über `BATTERIE_MIN_SOC` Stunde für Stunde 24 h fortschreiben: PV-Prognose × `NL_PV_FAKTOR` (0,9) minus
+1. Akkuinhalt über `BATTERIE_MIN_SOC` Stunde für Stunde 24 h fortschreiben: PV-Prognose (Anlage + Balkonkraftwerk) × `NL_PV_FAKTOR` (0,9) minus
    Lastprofil × `NL_LAST_FAKTOR` (1,2), Wirkungsgrad `NL_WIRKUNGSGRAD` (0,85 hin und zurück), höchstens
    `BATTERIE_MAX_W` Entladung.
 2. Fehlt dem Haus in einer Stunde Energie und kostet diese Stunde mindestens

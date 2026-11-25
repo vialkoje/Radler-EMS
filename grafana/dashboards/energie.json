@@ -555,7 +555,7 @@
             "type": "influxdb",
             "uid": "radler-influx"
           },
-          "query": "from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"haus\" and (r._field == \"verbrauch_W\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"verbrauch_W\"])\n  |> rename(columns: {verbrauch_W: \"Haus\"})"
+          "query": "from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"bkw\" and (r._field == \"leistung_W\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"leistung_W\"])\n  |> rename(columns: {leistung_W: \"Balkonkraftwerk\"})"
         },
         {
           "refId": "C",
@@ -563,7 +563,7 @@
             "type": "influxdb",
             "uid": "radler-influx"
           },
-          "query": "from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"netz\" and (r._field == \"bezug_W\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"bezug_W\"])\n  |> rename(columns: {bezug_W: \"Netz\"})"
+          "query": "from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"haus\" and (r._field == \"verbrauch_W\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"verbrauch_W\"])\n  |> rename(columns: {verbrauch_W: \"Haus\"})"
         },
         {
           "refId": "D",
@@ -571,7 +571,7 @@
             "type": "influxdb",
             "uid": "radler-influx"
           },
-          "query": "from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"batterie\" and (r._field == \"leistung_W\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"leistung_W\"])\n  |> rename(columns: {leistung_W: \"Batterie\"})"
+          "query": "from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"netz\" and (r._field == \"bezug_W\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"bezug_W\"])\n  |> rename(columns: {bezug_W: \"Netz\"})"
         },
         {
           "refId": "E",
@@ -579,10 +579,18 @@
             "type": "influxdb",
             "uid": "radler-influx"
           },
-          "query": "from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"wallbox\" and (r._field == \"leistung_W\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"leistung_W\"])\n  |> rename(columns: {leistung_W: \"Wallbox\"})"
+          "query": "from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"batterie\" and (r._field == \"leistung_W\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"leistung_W\"])\n  |> rename(columns: {leistung_W: \"Batterie\"})"
         },
         {
           "refId": "F",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "radler-influx"
+          },
+          "query": "from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"wallbox\" and (r._field == \"leistung_W\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"leistung_W\"])\n  |> rename(columns: {leistung_W: \"Wallbox\"})"
+        },
+        {
+          "refId": "G",
           "datasource": {
             "type": "influxdb",
             "uid": "radler-influx"
@@ -618,6 +626,21 @@
                 "value": {
                   "mode": "fixed",
                   "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Balkonkraftwerk"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "light-yellow"
                 }
               }
             ]
@@ -830,7 +853,7 @@
       "id": 11,
       "type": "timeseries",
       "title": "PV: Prognose und Ist",
-      "description": "",
+      "description": "Prognose = Anlage + Balkonkraftwerk; Ist gestapelt",
       "datasource": {
         "type": "influxdb",
         "uid": "radler-influx"
@@ -857,6 +880,14 @@
             "uid": "radler-influx"
           },
           "query": "from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"pv\" and (r._field == \"leistung_W\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"leistung_W\"])\n  |> rename(columns: {leistung_W: \"Ist\"})"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "radler-influx"
+          },
+          "query": "from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"bkw\" and (r._field == \"leistung_W\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"leistung_W\"])\n  |> rename(columns: {leistung_W: \"Ist Balkonkraftwerk\"})"
         }
       ],
       "fieldConfig": {
@@ -908,6 +939,28 @@
           {
             "matcher": {
               "id": "byName",
+              "options": "Ist Balkonkraftwerk"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "light-yellow"
+                }
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "mode": "normal",
+                  "group": "ist"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
               "options": "Ist"
             },
             "properties": [
@@ -916,6 +969,13 @@
                 "value": {
                   "mode": "fixed",
                   "fixedColor": "orange"
+                }
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "mode": "normal",
+                  "group": "ist"
                 }
               }
             ]
@@ -1027,7 +1087,7 @@
             "type": "influxdb",
             "uid": "radler-influx"
           },
-          "query": "t0 = from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"pv\" and r._field == \"leistung_W\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: r._value}))\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> integral(unit: 1h)\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0}))\n  |> set(key: \"_field\", value: \"PV\")\n  |> set(key: \"x\", value: \"1\")\n  |> keep(columns: [\"x\", \"_field\", \"_value\"])\nt1 = from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"haus\" and r._field == \"verbrauch_W\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: r._value}))\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> integral(unit: 1h)\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0}))\n  |> set(key: \"_field\", value: \"Haus\")\n  |> set(key: \"x\", value: \"1\")\n  |> keep(columns: [\"x\", \"_field\", \"_value\"])\nt2 = from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"netz\" and r._field == \"bezug_W\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: if r._value > 0.0 then r._value else 0.0}))\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> integral(unit: 1h)\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0}))\n  |> set(key: \"_field\", value: \"Bezug\")\n  |> set(key: \"x\", value: \"1\")\n  |> keep(columns: [\"x\", \"_field\", \"_value\"])\nt3 = from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"netz\" and r._field == \"bezug_W\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: if r._value < 0.0 then -r._value else 0.0}))\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> integral(unit: 1h)\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0}))\n  |> set(key: \"_field\", value: \"Einspeisung\")\n  |> set(key: \"x\", value: \"1\")\n  |> keep(columns: [\"x\", \"_field\", \"_value\"])\nt4 = from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"wallbox\" and r._field == \"leistung_W\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: r._value}))\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> integral(unit: 1h)\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0}))\n  |> set(key: \"_field\", value: \"Auto\")\n  |> set(key: \"x\", value: \"1\")\n  |> keep(columns: [\"x\", \"_field\", \"_value\"])\nt5 = from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"wp\" and r._field == \"leistung_W\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: r._value}))\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> integral(unit: 1h)\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0}))\n  |> set(key: \"_field\", value: \"Wärmepumpe\")\n  |> set(key: \"x\", value: \"1\")\n  |> keep(columns: [\"x\", \"_field\", \"_value\"])\nunion(tables: [t0, t1, t2, t3, t4, t5])\n  |> pivot(rowKey: [\"x\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> drop(columns: [\"x\"])"
+          "query": "t0 = from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"pv\" and r._field == \"leistung_W\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: r._value}))\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> integral(unit: 1h)\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0}))\n  |> set(key: \"_field\", value: \"PV\")\n  |> set(key: \"x\", value: \"1\")\n  |> keep(columns: [\"x\", \"_field\", \"_value\"])\nt1 = from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"bkw\" and r._field == \"leistung_W\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: r._value}))\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> integral(unit: 1h)\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0}))\n  |> set(key: \"_field\", value: \"Balkonkraftwerk\")\n  |> set(key: \"x\", value: \"1\")\n  |> keep(columns: [\"x\", \"_field\", \"_value\"])\nt2 = from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"haus\" and r._field == \"verbrauch_W\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: r._value}))\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> integral(unit: 1h)\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0}))\n  |> set(key: \"_field\", value: \"Haus\")\n  |> set(key: \"x\", value: \"1\")\n  |> keep(columns: [\"x\", \"_field\", \"_value\"])\nt3 = from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"netz\" and r._field == \"bezug_W\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: if r._value > 0.0 then r._value else 0.0}))\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> integral(unit: 1h)\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0}))\n  |> set(key: \"_field\", value: \"Bezug\")\n  |> set(key: \"x\", value: \"1\")\n  |> keep(columns: [\"x\", \"_field\", \"_value\"])\nt4 = from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"netz\" and r._field == \"bezug_W\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: if r._value < 0.0 then -r._value else 0.0}))\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> integral(unit: 1h)\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0}))\n  |> set(key: \"_field\", value: \"Einspeisung\")\n  |> set(key: \"x\", value: \"1\")\n  |> keep(columns: [\"x\", \"_field\", \"_value\"])\nt5 = from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"wallbox\" and r._field == \"leistung_W\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: r._value}))\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> integral(unit: 1h)\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0}))\n  |> set(key: \"_field\", value: \"Auto\")\n  |> set(key: \"x\", value: \"1\")\n  |> keep(columns: [\"x\", \"_field\", \"_value\"])\nt6 = from(bucket: \"geraete\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"wp\" and r._field == \"leistung_W\")\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: r._value}))\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> integral(unit: 1h)\n  |> map(fn: (r) => ({r with _value: r._value / 1000.0}))\n  |> set(key: \"_field\", value: \"Wärmepumpe\")\n  |> set(key: \"x\", value: \"1\")\n  |> keep(columns: [\"x\", \"_field\", \"_value\"])\nunion(tables: [t0, t1, t2, t3, t4, t5, t6])\n  |> pivot(rowKey: [\"x\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> drop(columns: [\"x\"])"
         }
       ],
       "fieldConfig": {

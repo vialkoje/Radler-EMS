@@ -33,6 +33,7 @@ Ausgang des Adapters → Link „→ Messwerte“:
 | `geraet` | Felder | Vorzeichen / Werte | Takt |
 |---|---|---|---|
 | `pv` | `leistung_W` | ≥ 0 (AC-Leistung der PV; beim Hybrid-WR ohne Batterieanteil) | 10 s |
+| `bkw` | `leistung_W`, optional `soc_pct` | ≥ 0, AC-Abgabe des Balkonkraftwerks | 10–60 s |
 | `netz` | `bezug_W` | **> 0 Bezug, < 0 Einspeisung** (Zähler am Netzanschluss) | 10 s |
 | `batterie` | `soc_pct`, `leistung_W` | **> 0 Entladen, < 0 Laden** | 10 s |
 | `wallbox` | `leistung_W`, `status`, `ampere` | status: `getrennt`, `angesteckt`, `laedt`, `pausiert`, `stoerung` | 10–60 s |
@@ -69,6 +70,11 @@ und schreibt eine Warnung ins Log (`node.warn` reicht).
 - Smart Meter am Netzanschluss? Welcher (Modell, Einbauort)? Liefert er die Netzleistung über den Wechselrichter?
 - Lokale Schnittstelle: Modbus TCP (SunSpec?) aktivierbar? Port, Unit-ID; oder HTTP/JSON-API
 - Dachflächen: Neigung, Ausrichtung, kWp je Fläche → `PV_FLAECHEN`
+
+**Balkonkraftwerk (falls vorhanden)**
+- Wechselrichter (Hersteller, Modell), Einspeisegrenze (800 W) → `BKW_MAX_W`; Module: Neigung, Ausrichtung, Wp → `BKW_FLAECHEN`
+- Lokale Schnittstelle? Viele Mikro-Wechselrichter haben keine; dann einen Messstecker (z. B. Shelly Plug S, lokal per HTTP oder MQTT) davor
+- Mit eigenem Akku (z. B. Anker Solix, Zendure, Solakon ONE)? Dann regelt er oft selbst auf Nulleinspeisung, siehe [Simulator](simulator.md#grenzen) und Haus-EMS
 
 **PV-Batterie**
 - Hersteller, Modell, nutzbare Kapazität, max. Lade-/Entladeleistung → `BATTERIE_*`

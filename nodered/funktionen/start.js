@@ -7,9 +7,9 @@
 global.set('radler_start', Date.now());
 
 const MODI = ['EMS_MODUS', 'WB_MODUS', 'WP_MODUS', 'WL_MODUS', 'HA_MODUS', 'WB_PV_MODUS'];
-const QUELLEN = ['PV_QUELLE', 'NETZ_QUELLE', 'BATTERIE_QUELLE', 'WALLBOX_QUELLE', 'AUTO_QUELLE', 'WP_QUELLE'];
+const QUELLEN = ['PV_QUELLE', 'BKW_QUELLE', 'NETZ_QUELLE', 'BATTERIE_QUELLE', 'WALLBOX_QUELLE', 'AUTO_QUELLE', 'WP_QUELLE'];
 const modi = MODI.map(n => `${n}=${env.get(n) || '(Standard)'}`).join(', ');
-const quellen = QUELLEN.map(n => `${n}=${env.get(n) || 'simulator'}`).join(', ');
+const quellen = QUELLEN.map(n => `${n}=${env.get(n) || (n === 'BKW_QUELLE' ? 'aus' : 'simulator')}`).join(', ');
 
 const msgs = [{ log: { stufe: 'info', bereich: 'system', text: 'Node-RED gestartet', daten: { modi, quellen } } }];
 

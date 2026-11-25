@@ -29,6 +29,7 @@ if (!msg.schritt) {
   |> range(start: ${new Date(start).toISOString()}, stop: ${new Date(stop).toISOString()})
   |> filter(fn: (r) => (r._measurement == "netz" and r._field == "bezug_W") or
                        (r._measurement == "pv" and r._field == "leistung_W") or
+                       (r._measurement == "bkw" and r._field == "leistung_W") or
                        (r._measurement == "wallbox" and r._field == "leistung_W"))
   |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)
   |> keep(columns: ["_time", "_value", "_measurement"])`;
@@ -65,7 +66,7 @@ function preisZu(t) {
     for (const [tp, v] of preise) { if (tp <= t) p = v; else break; }
     return p;
 }
-let bezug = 0, einspeisung = 0, kosten = 0, pv = 0, auto = 0, ohnePreis = 0;
+let bezug = 0, einspeisung = 0, kosten = 0, pv = 0, bkw = 0, auto = 0, ohnePreis = 0;
 for (const r of b.geraete) {
     const t = new Date(r._time).getTime() - 60000; // aggregateWindow stempelt das Ende der Minute
     const kWh = r._value / 60000;
@@ -79,12 +80,13 @@ for (const r of b.geraete) {
             kosten += kWh * einspeiseCt / 100;
         }
     } else if (r._measurement === 'pv') pv += Math.max(0, kWh);
+    else if (r._measurement === 'bkw') bkw += Math.max(0, kWh);
     else if (r._measurement === 'wallbox') auto += Math.max(0, kWh);
 }
 const nlStunden = nl.filter(r => r._value >= 1).length * 0.25;
 const datum = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit' }).format(b.start);
 let text = `📊 Tagesbericht ${datum}.: Strom ${fmt(kosten, 2)} € (Bezug ${fmt(bezug)} kWh, Einspeisung ${fmt(einspeisung)} kWh)` +
-    ` · PV ${fmt(pv)} kWh · Auto ${fmt(auto)} kWh · Netzladen ${fmt(nlStunden, 2)} h`;
+    ` · PV ${fmt(pv + bkw)} kWh${bkw > 0.05 ? ` (davon Balkon ${fmt(bkw)})` : ''} · Auto ${fmt(auto)} kWh · Netzladen ${fmt(nlStunden, 2)} h`;
 if (ohnePreis > 0.05) text += ` (${fmt(ohnePreis)} kWh ohne Preis)`;
 const nacht = global.get('meldung_nacht') || [];
 if (nacht.length) text += '\nNachts zurückgehalten:\n' + nacht.map(x => '· ' + x.text).join('\n');
@@ -92,4 +94,4 @@ global.set('meldung_nacht', []);
 node.status({ fill: 'green', shape: 'dot', text: text.slice(0, 60) });
 return [null, { log: { stufe: 'info', bereich: 'system', melden: 'tagesbericht', text,
     daten: { kosten_eur: +kosten.toFixed(2), bezug_kWh: +bezug.toFixed(2), einspeisung_kWh: +einspeisung.toFixed(2),
-             pv_kWh: +pv.toFixed(2), auto_kWh: +auto.toFixed(2), netzladen_h: nlStunden } } }];
+             pv_kWh: +(pv + bkw).toFixed(2), bkw_kWh: +bkw.toFixed(2), auto_kWh: +auto.toFixed(2), netzladen_h: nlStunden } } }];

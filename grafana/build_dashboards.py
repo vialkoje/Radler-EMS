@@ -135,9 +135,10 @@ def energie():
         '  |> filter(fn: (r) => r._time <= now())\n  |> group()\n  |> last()\n'
         '  |> keep(columns: ["_time", "_value"])\n  |> rename(columns: {_value: "ct/kWh"})')
 
-    leist = {"pv": ("PV", "yellow"), "haus": ("Haus", "text"), "netz": ("Netz", "red"), "batterie": ("Batterie", "blue"),
+    leist = {"pv": ("PV", "yellow"), "bkw": ("Balkonkraftwerk", "light-yellow"), "haus": ("Haus", "text"), "netz": ("Netz", "red"), "batterie": ("Batterie", "blue"),
              "wallbox": ("Wallbox", "purple"), "wp": ("Wärmepumpe", "orange")}
-    abfragen = [q_reihe("geraete", "pv", "leistung_W", "PV"), q_reihe("geraete", "haus", "verbrauch_W", "Haus"),
+    abfragen = [q_reihe("geraete", "pv", "leistung_W", "PV"), q_reihe("geraete", "bkw", "leistung_W", "Balkonkraftwerk"),
+                q_reihe("geraete", "haus", "verbrauch_W", "Haus"),
                 q_reihe("geraete", "netz", "bezug_W", "Netz"), q_reihe("geraete", "batterie", "leistung_W", "Batterie"),
                 q_reihe("geraete", "wallbox", "leistung_W", "Wallbox"), q_reihe("geraete", "wp", "leistung_W", "Wärmepumpe")]
     p.append(panel("timeseries", "Leistungen (Netz + Bezug / − Einspeisung, Batterie + Entladen / − Laden)", 0, 4, 24, 10,
@@ -149,16 +150,20 @@ def energie():
                    [farbe("Batterie", "blue"), farbe("Auto", "purple")]))
     p.append(panel("timeseries", "PV: Prognose und Ist", 12, 14, 12, 8,
                    [q_reihe("markt", "pv_prognose", "leistung_W", "Prognose", every="1h"),
-                    q_reihe("geraete", "pv", "leistung_W", "Ist")],
+                    q_reihe("geraete", "pv", "leistung_W", "Ist"),
+                    q_reihe("geraete", "bkw", "leistung_W", "Ist Balkonkraftwerk")],
                    "watt", 0, custom=LINIE, optionen=TS,
                    overrides=[farbe("Prognose", "yellow", **{"custom.lineStyle": {"fill": "dash", "dash": [10, 10]},
-                                                             "custom.fillOpacity": 0}), farbe("Ist", "orange")]))
+                                                             "custom.fillOpacity": 0}),
+                              farbe("Ist Balkonkraftwerk", "light-yellow", **{"custom.stacking": {"mode": "normal", "group": "ist"}}),
+                              farbe("Ist", "orange", **{"custom.stacking": {"mode": "normal", "group": "ist"}})],
+                   beschreibung="Prognose = Anlage + Balkonkraftwerk; Ist gestapelt"))
     p.append(panel("timeseries", "Strompreis (Endpreis, Viertelstunden)", 0, 22, 12, 8,
                    q_reihe("markt", "strompreis", "preis_ct", "Preis", fn="last", every="15m"),
                    "none", 1, custom=STUFE, optionen=TS, overrides=[farbe("Preis", "green")],
                    beschreibung="ct/kWh: Börse DE-LU (Energy-Charts) + ABGABEN_CT"))
     p.append(panel("stat", "Energie im Zeitraum (kWh)", 12, 22, 12, 8,
-                   q_energie([("PV", "pv", "leistung_W", 0), ("Haus", "haus", "verbrauch_W", 0),
+                   q_energie([("PV", "pv", "leistung_W", 0), ("Balkonkraftwerk", "bkw", "leistung_W", 0), ("Haus", "haus", "verbrauch_W", 0),
                               ("Bezug", "netz", "bezug_W", 1), ("Einspeisung", "netz", "bezug_W", -1),
                               ("Auto", "wallbox", "leistung_W", 0), ("Wärmepumpe", "wp", "leistung_W", 0)]),
                    "kwatth", 1, {"thresholds": schwellen((None, "text"))},

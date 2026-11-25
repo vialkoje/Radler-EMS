@@ -7,12 +7,13 @@
 //             BATTERIE_KAPAZITAET_WH, BATTERIE_MAX_W, BATTERIE_MIN_SOC, WB_PHASEN, WB_MAX_A, WB_AKKU_KWH, SIM_ZUFALL
 // Modell (bewusst einfach, Zahlen in docs/simulator.md):
 //   PV        = Prognose der laufenden Stunde × Wolkenfaktor (Zufallsweg 0,5 … 1,05)
+//   BKW       = Prognose des Balkonkraftwerks × Wolkenfaktor, höchstens BKW_MAX_W (nur mit BKW_QUELLE = simulator)
 //   Haus      = Grundlast 250 W + Tagesprofil + gelegentliche Spitzen (Wasserkocher, Herd)
 //   WP        = Gebäude mit 20 kWh/K Speicher und 0,15 kW/K Verlust; Heizlauf mit 1,8 kW el. (COP 3,5),
 //               Warmwasser 6:30 und 18:30 je 30 min mit 2,2 kW; SG-Ready 3 / Anhebung hebt den Raumsollwert
 //   Auto      = werktags 7:00–17:30 unterwegs (kommt mit −15 % zurück), Ladeziel im Auto 80 %
 //   Batterie  = Wirkungsgrad 95 % je Richtung, folgt dem Befehl (eigenverbrauch, laden, begrenzt)
-//   Netz      = Haus + WP + Wallbox − PV − Batterie
+//   Netz      = Haus + WP + Wallbox − PV − Balkonkraftwerk − Batterie
 
 const jetzt = Date.now();
 const abbild = global.get('abbild') || {};
@@ -32,16 +33,18 @@ const dtH = Math.min(60, Math.max(1, (jetzt - s.zeit) / 1000)) / 3600; // Stunde
 s.zeit = jetzt;
 const { h, werktag } = stundeDez(jetzt);
 
-// ── PV ──
-let pv = 0;
-const prog = abbild['prognose.pv'];
-if (prog && Array.isArray(prog.wert)) {
+// ── PV und Balkonkraftwerk ──
+function ausPrognose(signal) {
+    const prog = abbild[signal];
+    if (!prog || !Array.isArray(prog.wert)) return 0;
     const h0 = Math.floor(jetzt / 3600000) * 3600000;
     const a = prog.wert.find(x => x.t === h0), b = prog.wert.find(x => x.t === h0 + 3600000);
-    if (a) pv = b ? a.W + (b.W - a.W) * ((jetzt - h0) / 3600000) : a.W;
+    return a ? (b ? a.W + (b.W - a.W) * ((jetzt - h0) / 3600000) : a.W) : 0;
 }
 s.wolke = Math.min(1.05, Math.max(0.5, s.wolke + (zufall() - 0.5) * 0.08));
-pv = Math.max(0, Math.round(pv * s.wolke));
+const pv = Math.max(0, Math.round((abbild['prognose.pv_anlage'] ? ausPrognose('prognose.pv_anlage') : ausPrognose('prognose.pv')) * s.wolke));
+const simBkw = (env.get('BKW_QUELLE') || 'aus') === 'simulator';
+const bkw = simBkw ? Math.max(0, Math.round(Math.min(zahl('BKW_MAX_W', 800), ausPrognose('prognose.bkw') * s.wolke))) : 0;
 
 // ── Haus (ohne WP und Wallbox) ──
 let haus = 250 + 50 * Math.sin(h / 24 * 2 * Math.PI);
@@ -97,7 +100,7 @@ const cap = zahl('BATTERIE_KAPAZITAET_WH', 10000), maxW = zahl('BATTERIE_MAX_W',
 const bb = global.get('befehl_batterie') || { modus: 'eigenverbrauch' };
 const befehlAlt = !bb.zeit || jetzt - bb.zeit > 5 * 60000; // Timeout: ohne neuen Befehl zurück in den Eigenverbrauch
 const modus = befehlAlt ? 'eigenverbrauch' : bb.modus;
-const bedarf = haus + wpW + wbW - pv; // > 0 Defizit, < 0 Überschuss
+const bedarf = haus + wpW + wbW - pv - bkw; // > 0 Defizit, < 0 Überschuss
 let batt = 0; // > 0 Entladen, < 0 Laden
 if (sim('BATTERIE_QUELLE')) {
     if (modus === 'laden') batt = -Math.min(maxW, bb.leistung_W || maxW);
@@ -114,17 +117,18 @@ if (sim('BATTERIE_QUELLE')) {
     s.soc = Math.min(100, Math.max(0, s.soc - wh / cap * 100));
     batt = Math.round(batt);
 }
-const netz = Math.round(haus + wpW + wbW - pv - batt);
+const netz = Math.round(haus + wpW + wbW - pv - bkw - batt);
 context.set('s', s);
 
 const msgs = [];
 const m = (geraet, quelleVar, payload) => { if (sim(quelleVar)) msgs.push({ geraet, quelle: 'simulator', payload, zeit: jetzt }); };
 m('pv', 'PV_QUELLE', { leistung_W: pv });
+if (simBkw) msgs.push({ geraet: 'bkw', quelle: 'simulator', payload: { leistung_W: bkw }, zeit: jetzt });
 m('batterie', 'BATTERIE_QUELLE', { soc_pct: +s.soc.toFixed(1), leistung_W: batt, modus });
 m('wallbox', 'WALLBOX_QUELLE', { leistung_W: wbW, status: wbStatus, ampere: wbW ? Math.round(wbW / 230 / phasen) : 0 });
 m('auto', 'AUTO_QUELLE', { soc_pct: +s.autoSoc.toFixed(1) });
 m('wp', 'WP_QUELLE', { leistung_W: wpW, status: wpStatus, raum_C: +s.raum.toFixed(2), aussen_C: aussen });
 m('netz', 'NETZ_QUELLE', { bezug_W: netz }); // zuletzt, damit die Hausbilanz alle Werte dieses Schritts sieht
 node.status({ fill: 'blue', shape: 'dot',
-    text: `PV ${pv} · Haus ${haus} · WP ${wpW} · Auto ${wbW} (${Math.round(s.autoSoc)} %) · Akku ${batt} (${s.soc.toFixed(0)} %) · Netz ${netz} W` });
+    text: `PV ${pv}${simBkw ? ' + BKW ' + bkw : ''} · Haus ${haus} · WP ${wpW} · Auto ${wbW} (${Math.round(s.autoSoc)} %) · Akku ${batt} (${s.soc.toFixed(0)} %) · Netz ${netz} W` });
 return [msgs];

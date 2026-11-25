@@ -11,6 +11,7 @@ dieser Tabelle. Im Code liest jede Regel ihre Werte mit `env.get('NAME')`.
 | `STANDORT_LAT`, `STANDORT_LON` | – (Warnung beim Start) | Koordinaten für Wetter und PV-Prognose |
 | `STANDORT_HOEHE`, `STANDORT_NAME` | – | Höhe in m (genauere Temperatur), Name als Tag `ort` im Wetter |
 | `PV_QUELLE`, `NETZ_QUELLE`, `BATTERIE_QUELLE`, `WALLBOX_QUELLE`, `WP_QUELLE` | `simulator` | `simulator`, `geraet` (Adapter), `aus` (Gerät fehlt, kein Wächter) |
+| `BKW_QUELLE` | `aus` | Balkonkraftwerk: `aus` (nicht vorhanden), `simulator`, `geraet` |
 | `AUTO_QUELLE` | `simulator` | zusätzlich `manuell` (Ladestand über `/radler/auto?soc=`) |
 | `SIM_ZUFALL` | `an` | `aus`: Simulator ohne Zufall |
 
@@ -31,6 +32,8 @@ dieser Tabelle. Im Code liest jede Regel ihre Werte mit `env.get('NAME')`.
 | Variable | Standard | Bedeutung |
 |---|---|---|
 | `PV_FLAECHEN` | `30/0/8` | Dachflächen `Neigung/Azimut/kWp;…`, Azimut 0 = Süd, −90 = Ost, 90 = West |
+| `BKW_FLAECHEN` | – | Flächen des Balkonkraftwerks wie `PV_FLAECHEN`, z. B. `90/0/0.8` (senkrecht, Süd, 800 Wp) |
+| `BKW_MAX_W` | `800` | Einspeisegrenze des Balkonkraftwerks (Wechselrichter), kappt Prognose und Simulator |
 | `PV_PR` | `0.85` | Performance Ratio (Verluste Wechselrichter, Wärme, Kabel) für die Prognose |
 | `BATTERIE_KAPAZITAET_WH` | `10000` | nutzbare Kapazität |
 | `BATTERIE_MAX_W` | `5000` | max. Lade-/Entladeleistung |

@@ -17,6 +17,7 @@ Verlauf nicht mehr gebraucht wird.
 | Bucket | Messreihe | Felder | Tags |
 |---|---|---|---|
 | geraete | `pv` | `leistung_W` | `quelle` (simulator, geraet) |
+| geraete | `bkw` | `leistung_W` (Balkonkraftwerk, falls vorhanden) | `quelle` |
 | geraete | `netz` | `bezug_W` (> 0 Bezug) | `quelle` |
 | geraete | `batterie` | `soc_pct`, `leistung_W` (> 0 Entladen), beim Simulator `modus` | `quelle` |
 | geraete | `wallbox` | `leistung_W`, `status`, `ampere` | `quelle` |
@@ -29,7 +30,7 @@ Verlauf nicht mehr gebraucht wird.
 | ems | `wp_steuerung` | siehe [Wärmepumpe](waermepumpe.md#protokoll-wp_steuerung) | |
 | ems | `ems_log` | `text` | `stufe` (fehler, warnung), `bereich` |
 | markt | `strompreis` | `boerse_ct`, `preis_ct` (Endpreis), je Viertelstunde | `quelle` |
-| markt | `pv_prognose` | `leistung_W` je Stunde (Zeitstempel = Beginn) | `quelle` |
+| markt | `pv_prognose` | `leistung_W` (gesamt), `anlage_W`, `bkw_W` je Stunde (Zeitstempel = Beginn) | `quelle` |
 | markt | `wetter` | `temperatur`, `gefuehlt`, `taupunkt`, `luftfeuchte`, `niederschlag`, `regen`, `schnee`, `wettercode`, `bewoelkung`, `luftdruck`, `luftdruck_ort`, `wind`, `windrichtung`, `boeen`, `tag` | `ort`, `quelle` |
 
 Beispiel (Flux, z. B. im Data Explorer unter `http://<pi>:8086`):

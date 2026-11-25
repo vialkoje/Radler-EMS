@@ -29,6 +29,7 @@ Regel für den Tag: **erst lesen, dann beobachten, dann schreiben.** Kein Gerät
 **Geräte**
 - Adapter für die vier Geräte (die Pflicht).
 - Ladestand des Autos über die Hersteller-API.
+- Balkonkraftwerk mit eigenem Akku: Nulleinspeisung, ohne dass sich die beiden Akkus gegenseitig laden (Haus-EMS hat das für den Solakon ONE gelöst).
 - Wärmepumpe: echten Stromzähler einbinden; Raumtemperatur aus vorhandenen Thermostaten.
 
 **Regeln verbessern**

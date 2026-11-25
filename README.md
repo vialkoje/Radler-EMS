@@ -1,7 +1,7 @@
 # Radler-EMS
 
 Energiemanagement für ein Haus mit **PV-Anlage mit Wechselrichter, PV-Batterie, Wallbox fürs E-Auto und
-Wärmepumpe**, auf einem Raspberry Pi mit **Node-RED, InfluxDB 2 und Grafana**.
+Wärmepumpe**, optional einem **Balkonkraftwerk**, auf einem Raspberry Pi mit **Node-RED, InfluxDB 2 und Grafana**.
 
 Abgeleitet aus dem Haus-EMS (zwei Hausakkus, Balkonkraftwerk, Waterkotte, Etrel), vereinfacht auf vier Geräte
 und **geräteunabhängig**: Jedes Gerät hängt über einen Adapter an einer festen Schnittstelle. Solange die echten
@@ -11,7 +11,7 @@ Beim Hackathon tauscht man nur noch Adapter gegen echte Geräte.
 ```mermaid
 flowchart LR
     subgraph Quellen
-        G["Geräte-Adapter<br/>PV · Netz · Batterie · Wallbox · Auto · WP"]
+        G["Geräte-Adapter<br/>PV · Balkonkraftwerk · Netz · Batterie · Wallbox · Auto · WP"]
         S["🧪 Simulator"]
         M["Strompreis (Energy-Charts)<br/>PV-Prognose, Wetter (Open-Meteo)"]
     end

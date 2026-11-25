@@ -190,12 +190,12 @@ def bauen():
               "Strategie (15 min): Netzladen nach Vorschau, Wasserlinie, Plan für Wallbox und Wärmepumpe.\n"
               "Ausführung (10 s): einziger Schreiber an die PV-Batterie.\n\nSiehe docs/ems.md.")
     g = t.gruppe("grp-lastprofil", "Lastprofil", "Stündlich: Hausverbrauch ohne Auto je Uhrzeit, Mittel der letzten 14 Tage (InfluxDB)")
-    g.inject("ems-lp-inj", "stündlich", 0, 1, ["ems-lp"], wiederholen=3600, verzoegerung="15")
+    g.inject("ems-lp-inj", "stündlich", 0, 1, ["ems-lp"], wiederholen=3600, verzoegerung="40")
     g.funktion("ems-lp", "Lastprofil", 1, 1, code("lastprofil.js"), 2, [["ems-lp-db"], []])
     g.influx_lesen("ems-lp-db", "InfluxDB lesen", 2, 1, ["ems-lp"])
 
     g = t.gruppe("grp-strategie", "Strategie", "Alle 15 min: Netzladen (Vorschau), Wasserlinie, Preise für Wallbox und Wärmepumpe → InfluxDB „ems_strategie“")
-    g.inject("ems-st-inj", "alle 15 min", 0, 1, ["ems-st"], wiederholen=900, verzoegerung="25")
+    g.inject("ems-st-inj", "alle 15 min", 0, 1, ["ems-st"], wiederholen=900, verzoegerung="60")
     g.funktion("ems-st", "Strategie", 1, 1, code("strategie.js"), 2, [["ems-st-db"], ["ems-st-log"]])
     g.link_out("ems-st-db", "→ Influx ems", 2, 1)
     g.link_out("ems-st-log", "→ Log", 2, 2)
@@ -221,10 +221,12 @@ def bauen():
         g.funktion(f"{pre}-bef-ad", f"Adapter {geraet}: senden (Vorlage)", 2, z, code("adapter_befehl_vorlage.js", geraet))
 
     t = f.tab("tab-pv", "☀️ PV & Netz",
-              "Adapter für PV-Wechselrichter und Netzzähler (oft im Wechselrichter). Solange PV_QUELLE/NETZ_QUELLE = simulator "
+              "Adapter für PV-Wechselrichter, Balkonkraftwerk (falls vorhanden) und Netzzähler (oft im Wechselrichter). Solange PV_QUELLE/NETZ_QUELLE = simulator "
               "ist, liefert der Simulator die Werte. Siehe docs/geraete-adapter.md.")
     g = t.gruppe("grp-pv-ad", "Adapter PV-Wechselrichter", "Vorlage: Gerät abfragen (HTTP/Modbus-Knoten vor „lesen“ einsetzen) → { leistung_W }")
     adapter_lesen(g, "pv", "pv", 1)
+    g = t.gruppe("grp-bkw-ad", "Adapter Balkonkraftwerk", "Vorlage, nur wenn vorhanden (BKW_QUELLE): { leistung_W } AC-Abgabe ≥ 0, optional soc_pct")
+    adapter_lesen(g, "bkw", "bkw", 1)
     g = t.gruppe("grp-netz-ad", "Adapter Netzzähler", "Vorlage: { bezug_W } mit > 0 Bezug, < 0 Einspeisung")
     adapter_lesen(g, "netz", "netz", 1)
 
@@ -280,16 +282,16 @@ def bauen():
     t = f.tab("tab-markt", "💶 Preise & Prognose",
               "Strompreise (Energy-Charts, Viertelstunden), PV-Prognose (Open-Meteo, Einstrahlung je Dachfläche) und Wetter "
               "am Standort. Alles ohne Anmeldung. Bucket „markt“.")
-    g = t.gruppe("grp-preise", "Strompreise", "Stündlich: Day-Ahead DE-LU + ABGABEN_CT → „strompreis“, Stundenpreise ins Prozessabbild")
-    g.inject("mk-pr-inj", "stündlich", 0, 1, ["mk-pr-q"], wiederholen=3600, verzoegerung="3")
+    g = t.gruppe("grp-preise", "Strompreise", "Alle 15 min (erster Abruf 30 s nach dem Start, Netz und DNS brauchen nach dem Booten etwas): Day-Ahead DE-LU + ABGABEN_CT → „strompreis“, Stundenpreise ins Prozessabbild")
+    g.inject("mk-pr-inj", "alle 15 min", 0, 1, ["mk-pr-q"], wiederholen=900, verzoegerung="30")
     g.funktion("mk-pr-q", "Abfrage bauen", 1, 1, code("preise_abfrage.js"), 1, [["mk-pr-http"]])
     g.http("mk-pr-http", "Energy-Charts", 2, 1, ["mk-pr"])
     g.funktion("mk-pr", "Preise auswerten", 3, 1, code("preise.js"), 2, [["mk-pr-db"], ["mk-pr-log"]])
     g.link_out("mk-pr-db", "→ Influx markt", 4, 1)
     g.link_out("mk-pr-log", "→ Log", 4, 2)
 
-    g = t.gruppe("grp-prognose", "PV-Prognose", "Stündlich: Einstrahlung je Dachfläche (PV_FLAECHEN) × kWp × PV_PR → „pv_prognose“, ins Prozessabbild")
-    g.inject("mk-pg-inj", "stündlich", 0, 1, ["mk-pg-q"], wiederholen=3600, verzoegerung="5")
+    g = t.gruppe("grp-prognose", "PV-Prognose", "Alle 30 min: Einstrahlung je Dachfläche (PV_FLAECHEN) × kWp × PV_PR → „pv_prognose“, ins Prozessabbild")
+    g.inject("mk-pg-inj", "alle 30 min", 0, 1, ["mk-pg-q"], wiederholen=1800, verzoegerung="35")
     g.funktion("mk-pg-q", "Abfrage je Fläche", 1, 1, code("prognose_abfrage.js"), 1, [["mk-pg-http"]])
     g.http("mk-pg-http", "Open-Meteo", 2, 1, ["mk-pg-fl"])
     g.funktion("mk-pg-fl", "Fläche anhängen", 3, 1,
@@ -305,8 +307,8 @@ def bauen():
     g.link_out("mk-pg-log", "→ Log", 6, 2)
 
     g = t.gruppe("grp-wetter", "Wetter", "Alle 10 min aktuelles Wetter, beim Start die letzten 48 h → „wetter“")
-    g.inject("mk-we-inj", "alle 10 min", 0, 1, ["mk-we-q"], wiederholen=600, verzoegerung="5", topic="aktuell")
-    g.inject("mk-we-verlauf", "Verlauf 48 h (Start)", 0, 2, ["mk-we-q"], verzoegerung="20", topic="verlauf")
+    g.inject("mk-we-inj", "alle 10 min", 0, 1, ["mk-we-q"], wiederholen=600, verzoegerung="30", topic="aktuell")
+    g.inject("mk-we-verlauf", "Verlauf 48 h (Start)", 0, 2, ["mk-we-q"], verzoegerung="45", topic="verlauf")
     g.funktion("mk-we-q", "Abfrage bauen", 1, 1, code("wetter_abfrage.js"), 1, [["mk-we-http"]])
     g.http("mk-we-http", "Open-Meteo", 2, 1, ["mk-we"])
     g.funktion("mk-we", "Wetter auswerten", 3, 1, code("wetter.js"), 1, [["mk-we-db"]])

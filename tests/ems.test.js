@@ -244,3 +244,43 @@ test('Tagesbericht: rechnet Kosten aus Minutenwerten und Viertelstundenpreisen',
 test('flows.json ist mit dem Generator gebaut', () => {
     execFileSync('python3', [path.join(__dirname, '..', 'nodered', 'build.py'), '--pruefen']);
 });
+
+test('Balkonkraftwerk: zählt in der Hausbilanz mit', () => {
+    const r = lauf('messwerte.js', {
+        jetzt: ABEND,
+        global: { abbild: abbild(ABEND, { 'pv.leistung_W': 1000, 'bkw.leistung_W': 600, 'batterie.leistung_W': 0 }) },
+        msg: { geraet: 'netz', quelle: 'test', payload: { bezug_W: -100 } },
+    });
+    assert.equal(r.ergebnis.payload.find(p => p.measurement === 'haus').fields.verbrauch_W, 1500);
+});
+
+test('Balkonkraftwerk: Prognose getrennt und auf BKW_MAX_W gekappt', () => {
+    const s = Math.floor(new Date(MITTAG).getTime() / 1000) + 3600;
+    const antwort = gti => ({ hourly: { time: [s], global_tilted_irradiance: [gti] } });
+    const r = lauf('prognose.js', { jetzt: MITTAG, env: { PV_PR: '1', BKW_MAX_W: '800' }, msg: { payload: [
+        { antwort: antwort(800), flaeche: { kwp: 10, art: 'anlage' } },
+        { antwort: antwort(800), flaeche: { kwp: 1.6, art: 'bkw' } },
+    ] } });
+    const f = r.ergebnis[0].payload[0].fields;
+    assert.deepEqual([f.anlage_W, f.bkw_W, f.leistung_W], [8000, 800, 8800]);   // 1280 W → 800 W gekappt
+    assert.equal(r.global.abbild['prognose.bkw'].wert[0].W, 800);
+});
+
+test('Balkonkraftwerk: Simulator nur mit BKW_QUELLE=simulator, Netz rechnet es mit', () => {
+    const t = new Date(MITTAG).getTime();
+    const h0 = Math.floor(t / 3600000) * 3600000;
+    const prog = W => ({ wert: [{ t: h0, W }, { t: h0 + 3600000, W }], zeit: t });
+    const g = () => ({ abbild: { 'prognose.pv_anlage': prog(3000), 'prognose.bkw': prog(2000) } });
+    const ohne = lauf('simulator.js', { jetzt: t, env: { SIM_ZUFALL: 'aus' }, global: g() });
+    assert.ok(!ohne.ergebnis[0].some(m => m.geraet === 'bkw'));
+    const mit = lauf('simulator.js', { jetzt: t, env: { SIM_ZUFALL: 'aus', BKW_QUELLE: 'simulator' }, global: g() });
+    const m = Object.fromEntries(mit.ergebnis[0].map(x => [x.geraet, x.payload]));
+    assert.equal(m.bkw.leistung_W, 800);                     // 2000 W × Wolke 0,9 = 1800 W, gekappt auf 800 W
+    assert.equal(m.pv.leistung_W, 2700);                     // 3000 W × 0,9
+    const ohneM = Object.fromEntries(ohne.ergebnis[0].map(x => [x.geraet, x.payload]));
+    // Bilanz: Netz + PV + BKW + Batterie = Verbrauch, in beiden Fällen gleich (im Eigenverbrauch nimmt der Akku die 800 W auf)
+    assert.equal(ohneM.netz.bezug_W + ohneM.pv.leistung_W + ohneM.batterie.leistung_W,
+                 m.netz.bezug_W + m.pv.leistung_W + m.bkw.leistung_W + m.batterie.leistung_W);
+    assert.equal(ohneM.batterie.leistung_W - m.batterie.leistung_W, 800);
+
+});

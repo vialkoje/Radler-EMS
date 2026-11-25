@@ -1,11 +1,12 @@
 // Geräte-Wächter: meldet Geräte, die keine Werte mehr liefern, und ihre Rückkehr
 // ─ Eingang: Inject jede Minute. Kontext: global.abbild
 // ─ Ausgang 1: msg.log (fehler mit melden 'geraet' bzw. info bei Rückkehr) → Log
-// ─ Umgebung: GERAET_OFFLINE_MIN (15), <GERÄT>_QUELLE (aus = nicht überwachen)
+// ─ Umgebung: GERAET_OFFLINE_MIN (15), <GERÄT>_QUELLE (aus = nicht überwachen; BKW_QUELLE ist ohne Angabe aus)
 
 const SIGNALE = [
     // [Signal, Name, Umgebungsvariable der Quelle, Grenze in Minuten (null = GERAET_OFFLINE_MIN)]
     ['pv.leistung_W', 'PV-Wechselrichter', 'PV_QUELLE', null],
+    ['bkw.leistung_W', 'Balkonkraftwerk', 'BKW_QUELLE', null],
     ['netz.bezug_W', 'Netzzähler', 'NETZ_QUELLE', null],
     ['batterie.soc_pct', 'PV-Batterie', 'BATTERIE_QUELLE', null],
     ['wallbox.status', 'Wallbox', 'WALLBOX_QUELLE', null],
@@ -23,7 +24,7 @@ const msgs = [];
 const fehlt = [];
 
 for (const [signal, name, quelleVar, grenzeMin] of SIGNALE) {
-    if (quelleVar && (env.get(quelleVar) || 'simulator') === 'aus') continue;
+    if (quelleVar && (env.get(quelleVar) || (quelleVar === 'BKW_QUELLE' ? 'aus' : 'simulator')) === 'aus') continue;
     const grenze = (grenzeMin || grenzeStd) * 60000;
     const e = abbild[signal];
     const alter = e ? jetzt - e.zeit : jetzt - start;

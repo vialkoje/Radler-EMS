@@ -1,0 +1,2977 @@
+[
+ {
+  "id": "tab-system",
+  "type": "tab",
+  "label": "⚙️ System",
+  "disabled": false,
+  "info": "Start, Prozessabbild, InfluxDB-Schreiber, Log, Meldungen, Geräte-Wächter, Tagesbericht.\n\nAlle anderen Tabs schicken Messwerte an „→ Messwerte“, Protokolle an „→ Influx …“ und Ereignisse an „→ Log“."
+ },
+ {
+  "id": "grp-start",
+  "type": "group",
+  "z": "tab-system",
+  "name": "Start",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-start-kom",
+   "sys-start-inj",
+   "sys-start",
+   "sys-start-log"
+  ],
+  "x": 14,
+  "y": 40,
+  "w": 720,
+  "h": 170
+ },
+ {
+  "id": "grp-start-kom",
+  "type": "comment",
+  "name": "Nach jedem Neustart: Startzeit merken, Einstellungen prüfen, Neustart ins Log",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 80,
+  "z": "tab-system",
+  "g": "grp-start"
+ },
+ {
+  "id": "sys-start-inj",
+  "type": "inject",
+  "name": "Start",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "2",
+  "topic": "",
+  "wires": [
+   [
+    "sys-start"
+   ]
+  ],
+  "x": 120,
+  "y": 140,
+  "z": "tab-system",
+  "g": "grp-start"
+ },
+ {
+  "id": "sys-start",
+  "type": "function",
+  "name": "Start prüfen",
+  "func": "// Start: nach jedem Neustart von Node-RED\n// ─ Zweck: Startzeit merken, Einstellungen prüfen, Neustart ins Log schreiben.\n// ─ Eingang: Inject einmal 2 s nach dem Start\n// ─ Ausgang 1: msg.log (info, bei fehlenden Pflichtwerten zusätzlich eine Warnung mit melden 'konfig')\n// ─ Kontext: global.radler_start\n\nglobal.set('radler_start', Date.now());\n\nconst MODI = ['EMS_MODUS', 'WB_MODUS', 'WP_MODUS', 'WL_MODUS', 'HA_MODUS', 'WB_PV_MODUS'];\nconst QUELLEN = ['PV_QUELLE', 'NETZ_QUELLE', 'BATTERIE_QUELLE', 'WALLBOX_QUELLE', 'AUTO_QUELLE', 'WP_QUELLE'];\nconst modi = MODI.map(n => `${n}=${env.get(n) || '(Standard)'}`).join(', ');\nconst quellen = QUELLEN.map(n => `${n}=${env.get(n) || 'simulator'}`).join(', ');\n\nconst msgs = [{ log: { stufe: 'info', bereich: 'system', text: 'Node-RED gestartet', daten: { modi, quellen } } }];\n\n// Ohne Standort gibt es weder Wetter noch PV-Prognose für den richtigen Ort\nconst fehlend = ['STANDORT_LAT', 'STANDORT_LON', 'PV_FLAECHEN'].filter(n => !env.get(n));\nif (fehlend.length) {\n    msgs.push({ log: { stufe: 'warnung', bereich: 'system', melden: 'konfig',\n        text: 'Einstellungen fehlen in secrets.env (Standardwerte aktiv): ' + fehlend.join(', ') } });\n}\nconst echte = QUELLEN.filter(n => env.get(n) === 'geraet');\nnode.status({ fill: 'green', shape: 'dot',\n    text: echte.length ? 'echte Geräte: ' + echte.join(', ') : 'alle Geräte im Simulator' });\nreturn [msgs];\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "sys-start-log"
+   ]
+  ],
+  "x": 350,
+  "y": 140,
+  "z": "tab-system",
+  "g": "grp-start"
+ },
+ {
+  "id": "sys-start-log",
+  "type": "link out",
+  "name": "→ Log",
+  "mode": "link",
+  "links": [
+   "log-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 140,
+  "z": "tab-system",
+  "g": "grp-start"
+ },
+ {
+  "id": "grp-abbild",
+  "type": "group",
+  "z": "tab-system",
+  "name": "Messwerte → Prozessabbild",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-abbild-kom",
+   "sys-mw-in",
+   "sys-mw",
+   "sys-mw-db"
+  ],
+  "x": 14,
+  "y": 250,
+  "w": 720,
+  "h": 170
+ },
+ {
+  "id": "grp-abbild-kom",
+  "type": "comment",
+  "name": "Einzige Stelle für Messwerte: global.abbild und InfluxDB „geraete“ (Bilanz: Messreihe „haus“)",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 290,
+  "z": "tab-system",
+  "g": "grp-abbild"
+ },
+ {
+  "id": "sys-mw-in",
+  "type": "link in",
+  "name": "→ Messwerte",
+  "links": [
+   "pv-lesen-mw",
+   "netz-lesen-mw",
+   "bat-lesen-mw",
+   "wb-lesen-mw",
+   "auto-lesen-mw",
+   "auto-hand-mw",
+   "wp-lesen-mw",
+   "sim-mw"
+  ],
+  "wires": [
+   [
+    "sys-mw"
+   ]
+  ],
+  "x": 120,
+  "y": 350,
+  "z": "tab-system",
+  "g": "grp-abbild"
+ },
+ {
+  "id": "sys-mw",
+  "type": "function",
+  "name": "Prozessabbild + Bilanz",
+  "func": "// Messwerte → Prozessabbild und InfluxDB (Bucket \"geraete\")\n// ─ Zweck: einzige Stelle, an der Messwerte ins Prozessabbild (global.abbild) und in die InfluxDB gehen (R1).\n// ─ Eingang: msg.geraet ('pv', 'netz', 'batterie', 'wallbox', 'auto', 'wp' …),\n//            msg.payload = { feld: wert, … } (Feldnamen mit Einheit als Endung: leistung_W, soc_pct, raum_C),\n//            msg.quelle ('simulator', 'geraet', 'manuell' …), optional msg.zeit (ms).\n// ─ Ausgang 1: msg.payload = InfluxDB-Punkte für den Batch-Knoten.\n// ─ Kontext: global.abbild = { 'geraet.feld': { wert, einheit, zeit, quelle } }\n// Kommt ein Netzwert, rechnet der Knoten die Hausbilanz (Messreihe \"haus\"):\n//   verbrauch = Netzbezug + PV + Batterie-Entladung (alle Vorzeichen siehe docs/architektur.md)\n\nconst EINHEITEN = [['_kWh', 'kWh'], ['_Wh', 'Wh'], ['_W', 'W'], ['_pct', '%'], ['_C', '°C'], ['_K', 'K'], ['_A', 'A']];\nfunction einheit(feld) {\n    for (const [endung, e] of EINHEITEN) if (feld.endsWith(endung)) return e;\n    return '';\n}\n\nconst geraet = msg.geraet;\nif (!geraet || !msg.payload || typeof msg.payload !== 'object') {\n    node.warn('Messwert ohne msg.geraet oder msg.payload verworfen');\n    return null;\n}\nconst zeit = msg.zeit || Date.now();\nconst quelle = msg.quelle || 'unbekannt';\nconst abbild = global.get('abbild') || {};\n\nconst fields = {};\nfor (const [feld, w] of Object.entries(msg.payload)) {\n    if (w === null || w === undefined) continue;\n    if (typeof w === 'number' && !isFinite(w)) continue;\n    abbild[geraet + '.' + feld] = { wert: w, einheit: einheit(feld), zeit, quelle };\n    if (typeof w === 'boolean') fields[feld] = w ? 1 : 0;\n    else if (typeof w === 'number' || typeof w === 'string') fields[feld] = w;\n}\nif (!Object.keys(fields).length) return null;\n\nconst punkte = [{ measurement: geraet, tags: { quelle }, fields, timestamp: new Date(zeit) }];\n\nif (geraet === 'netz' && typeof fields.bezug_W === 'number') {\n    // Hausbilanz: Werte höchstens 60 s alt, fehlende Geräte zählen als 0\n    const g = s => { const e = abbild[s]; return e && zeit - e.zeit <= 60000 && typeof e.wert === 'number' ? e.wert : 0; };\n    const verbrauch = Math.max(0, fields.bezug_W + g('pv.leistung_W') + g('batterie.leistung_W'));\n    const ohneAuto = Math.max(0, verbrauch - g('wallbox.leistung_W'));\n    const haus = {\n        verbrauch_W: Math.round(verbrauch),\n        ohne_auto_W: Math.round(ohneAuto),\n        grundlast_W: Math.round(Math.max(0, ohneAuto - g('wp.leistung_W'))),\n    };\n    for (const [feld, w] of Object.entries(haus)) abbild['haus.' + feld] = { wert: w, einheit: 'W', zeit, quelle: 'bilanz' };\n    punkte.push({ measurement: 'haus', tags: { quelle: 'bilanz' }, fields: haus, timestamp: new Date(zeit) });\n}\n\nglobal.set('abbild', abbild);\nconst n = (context.get('n') || 0) + 1;\ncontext.set('n', n);\nnode.status({ fill: 'green', shape: 'dot', text: `${geraet} (${quelle}) · ${Object.keys(abbild).length} Signale · ${n} Meldungen` });\nmsg.payload = punkte;\nreturn msg;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "sys-mw-db"
+   ]
+  ],
+  "x": 350,
+  "y": 350,
+  "z": "tab-system",
+  "g": "grp-abbild"
+ },
+ {
+  "id": "sys-mw-db",
+  "type": "link out",
+  "name": "→ Influx geraete",
+  "mode": "link",
+  "links": [
+   "sys-db-geraete-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 350,
+  "z": "tab-system",
+  "g": "grp-abbild"
+ },
+ {
+  "id": "grp-influx",
+  "type": "group",
+  "z": "tab-system",
+  "name": "InfluxDB schreiben",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-influx-kom",
+   "sys-db-geraete-in",
+   "sys-db-geraete",
+   "sys-db-ems-in",
+   "sys-db-ems",
+   "sys-db-markt-in",
+   "sys-db-markt"
+  ],
+  "x": 14,
+  "y": 460,
+  "w": 620,
+  "h": 290
+ },
+ {
+  "id": "grp-influx-kom",
+  "type": "comment",
+  "name": "Je Bucket ein Schreiber: geraete (Messwerte), ems (Entscheidungen, Log), markt (Preise, Prognose, Wetter)",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 500,
+  "z": "tab-system",
+  "g": "grp-influx"
+ },
+ {
+  "id": "sys-db-geraete-in",
+  "type": "link in",
+  "name": "→ Influx geraete",
+  "links": [
+   "sys-mw-db"
+  ],
+  "wires": [
+   [
+    "sys-db-geraete"
+   ]
+  ],
+  "x": 120,
+  "y": 560,
+  "z": "tab-system",
+  "g": "grp-influx"
+ },
+ {
+  "id": "sys-db-geraete",
+  "type": "influxdb batch",
+  "influxdb": "influx-radler",
+  "precision": "",
+  "retentionPolicy": "",
+  "name": "InfluxDB geraete",
+  "database": "database",
+  "precisionV18FluxV20": "ms",
+  "retentionPolicyV18Flux": "",
+  "org": "home",
+  "bucket": "geraete",
+  "wires": [],
+  "x": 350,
+  "y": 560,
+  "z": "tab-system",
+  "g": "grp-influx"
+ },
+ {
+  "id": "sys-db-ems-in",
+  "type": "link in",
+  "name": "→ Influx ems",
+  "links": [
+   "log-db",
+   "ems-st-db",
+   "ems-af-db",
+   "wb-plan-db",
+   "wp-st-db"
+  ],
+  "wires": [
+   [
+    "sys-db-ems"
+   ]
+  ],
+  "x": 120,
+  "y": 620,
+  "z": "tab-system",
+  "g": "grp-influx"
+ },
+ {
+  "id": "sys-db-ems",
+  "type": "influxdb batch",
+  "influxdb": "influx-radler",
+  "precision": "",
+  "retentionPolicy": "",
+  "name": "InfluxDB ems",
+  "database": "database",
+  "precisionV18FluxV20": "ms",
+  "retentionPolicyV18Flux": "",
+  "org": "home",
+  "bucket": "ems",
+  "wires": [],
+  "x": 350,
+  "y": 620,
+  "z": "tab-system",
+  "g": "grp-influx"
+ },
+ {
+  "id": "sys-db-markt-in",
+  "type": "link in",
+  "name": "→ Influx markt",
+  "links": [
+   "mk-pr-db",
+   "mk-pg-db",
+   "mk-we-db"
+  ],
+  "wires": [
+   [
+    "sys-db-markt"
+   ]
+  ],
+  "x": 120,
+  "y": 680,
+  "z": "tab-system",
+  "g": "grp-influx"
+ },
+ {
+  "id": "sys-db-markt",
+  "type": "influxdb batch",
+  "influxdb": "influx-radler",
+  "precision": "",
+  "retentionPolicy": "",
+  "name": "InfluxDB markt",
+  "database": "database",
+  "precisionV18FluxV20": "ms",
+  "retentionPolicyV18Flux": "",
+  "org": "home",
+  "bucket": "markt",
+  "wires": [],
+  "x": 350,
+  "y": 680,
+  "z": "tab-system",
+  "g": "grp-influx"
+ },
+ {
+  "id": "grp-log",
+  "type": "group",
+  "z": "tab-system",
+  "name": "Logeintrag erzeugen",
+  "info": "Warnungen und Fehler aller Knoten kommen über den Logger in settings.js dazu (deploy/settings-radler.js).",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-log-kom",
+   "log-in",
+   "log-fn",
+   "log-datei",
+   "log-db",
+   "log-meldung",
+   "log-ntfy",
+   "log-puffer-inj",
+   "log-puffer",
+   "log-aufr-inj",
+   "log-aufr"
+  ],
+  "x": 14,
+  "y": 790,
+  "w": 950,
+  "h": 410
+ },
+ {
+  "id": "grp-log-kom",
+  "type": "comment",
+  "name": "Ein Log: Datei je Tag (LOG_VERZEICHNIS), Fehler/Warnungen nach InfluxDB „ems_log“, Einträge mit melden → Meldung",
+  "info": "Warnungen und Fehler aller Knoten kommen über den Logger in settings.js dazu (deploy/settings-radler.js).",
+  "wires": [],
+  "x": 120,
+  "y": 830,
+  "z": "tab-system",
+  "g": "grp-log"
+ },
+ {
+  "id": "log-in",
+  "type": "link in",
+  "name": "→ Log",
+  "links": [
+   "sys-start-log",
+   "sys-w-log",
+   "sys-tb-log",
+   "ems-st-log",
+   "ems-af-log",
+   "wb-plan-log",
+   "wp-st-log",
+   "mk-pr-log",
+   "mk-pg-log"
+  ],
+  "wires": [
+   [
+    "log-fn"
+   ]
+  ],
+  "x": 120,
+  "y": 890,
+  "z": "tab-system",
+  "g": "grp-log"
+ },
+ {
+  "id": "log-fn",
+  "type": "function",
+  "name": "Logeintrag",
+  "func": "// Logeintrag erzeugen (R2): ein Log für alles\n// ─ Eingang: msg.log = { stufe: 'fehler'|'warnung'|'info', bereich, text, daten?, melden? }\n//            melden: true oder eine Art aus dem Meldekatalog ('zusage', 'geraet', 'wallbox' …)\n// ─ Ausgang 1: Zeile für die Logdatei (msg.filename, msg.payload = JSON)\n// ─ Ausgang 2: Fehler und Warnungen → InfluxDB (Bucket \"ems\", Messreihe \"ems_log\")\n// ─ Ausgang 3: Einträge mit melden → Meldung prüfen\n// ─ Umgebung: LOG_VERZEICHNIS (Standard /home/pi/radler-ems/log)\n\nconst STUFEN = ['fehler', 'warnung', 'info'];\nconst l = msg.log || {};\nconst stufe = STUFEN.includes(l.stufe) ? l.stufe : 'info';\nconst jetzt = new Date();\nconst eintrag = { zeit: jetzt.toISOString(), stufe, bereich: l.bereich || 'system', text: String(l.text || '') };\nif (l.daten !== undefined) eintrag.daten = l.daten;\nif (l.melden) eintrag.melden = l.melden;\n\n// Datum in deutscher Zeit, eine Datei je Tag\nconst tag = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(jetzt);\nconst verzeichnis = (env.get('LOG_VERZEICHNIS') || '/home/pi/radler-ems/log').replace(/\\/$/, '');\nconst datei = { filename: `${verzeichnis}/radler-ems-${tag}.log`, payload: JSON.stringify(eintrag) };\n\nconst influx = stufe === 'info' ? null : {\n    payload: [{ measurement: 'ems_log', tags: { stufe, bereich: eintrag.bereich }, fields: { text: eintrag.text }, timestamp: jetzt }],\n};\nconst meldung = l.melden ? { meldung: eintrag } : null;\n\nconst zaehler = context.get('zaehler') || { fehler: 0, warnung: 0, info: 0 };\nzaehler[stufe]++;\ncontext.set('zaehler', zaehler);\nnode.status({\n    fill: stufe === 'fehler' ? 'red' : stufe === 'warnung' ? 'yellow' : 'green', shape: 'dot',\n    text: `${zaehler.fehler} Fehler, ${zaehler.warnung} Warnungen, ${zaehler.info} Info · ${eintrag.text.slice(0, 50)}`,\n});\nreturn [datei, influx, meldung];\n",
+  "outputs": 3,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "log-datei"
+   ],
+   [
+    "log-db"
+   ],
+   [
+    "log-meldung"
+   ]
+  ],
+  "x": 350,
+  "y": 890,
+  "z": "tab-system",
+  "g": "grp-log"
+ },
+ {
+  "id": "log-datei",
+  "type": "file",
+  "name": "Logdatei",
+  "filename": "filename",
+  "filenameType": "msg",
+  "appendNewline": true,
+  "createDir": true,
+  "overwriteFile": "false",
+  "encoding": "utf8",
+  "wires": [],
+  "x": 580,
+  "y": 890,
+  "z": "tab-system",
+  "g": "grp-log"
+ },
+ {
+  "id": "log-db",
+  "type": "link out",
+  "name": "→ Influx ems",
+  "mode": "link",
+  "links": [
+   "sys-db-ems-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 950,
+  "z": "tab-system",
+  "g": "grp-log"
+ },
+ {
+  "id": "log-meldung",
+  "type": "function",
+  "name": "Meldung prüfen",
+  "func": "// Meldung prüfen (R5): Katalog, Sperrzeit, Nachtruhe, Versand über ntfy\n// ─ Eingang: msg.meldung = Logeintrag mit melden (vom Knoten \"Logeintrag erzeugen\")\n// ─ Ausgang 1: HTTP-Anfrage an ntfy (JSON), nur wenn NTFY_TOPIC gesetzt ist\n// ─ Ausgang 2: msg.log (Info: gesendet / wartet / kein Kanal) → Log, ohne melden (keine Schleife)\n// ─ Umgebung: NTFY_TOPIC, NTFY_SERVER (Standard https://ntfy.sh), MELDUNG_RUHE_VON (22), MELDUNG_RUHE_BIS (7)\n// ─ Kontext: context.gesendet (Sperrzeiten), global.meldung_nacht (nachts zurückgehalten, für den Tagesbericht)\n\nconst KATALOG = {\n    zusage:       { titel: 'Zusage in Gefahr', sperre_min: 60,  nachts: true,  prio: 5 },\n    geraet:       { titel: 'Gerät',            sperre_min: 60,  nachts: true,  prio: 4 },\n    befehl:       { titel: 'Befehl abgelehnt', sperre_min: 60,  nachts: false, prio: 4 },\n    konfig:       { titel: 'Einstellung',      sperre_min: 360, nachts: false, prio: 3 },\n    wallbox:      { titel: 'Wallbox',          sperre_min: 0,   nachts: true,  prio: 3 },\n    tagesbericht: { titel: 'Tagesbericht',     sperre_min: 0,   nachts: true,  prio: 2 },\n    sonst:        { titel: 'Radler-EMS',       sperre_min: 60,  nachts: false, prio: 3 },\n};\n\nfunction zahl(name, std) { const n = parseFloat(env.get(name)); return isNaN(n) ? std : n; }\nfunction stundeBerlin(t) {\n    return parseInt(new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: 'numeric', hourCycle: 'h23' }).format(t), 10);\n}\n\nconst e = msg.meldung;\nif (!e || !e.text) return null;\nconst art = typeof e.melden === 'string' && KATALOG[e.melden] ? e.melden : 'sonst';\nconst k = KATALOG[art];\nconst jetzt = Date.now();\n\n// Sperrzeit: gleiche Meldung (Zahlen zählen nicht als Unterschied) höchstens einmal je Sperrzeit\nconst schluessel = art + ':' + e.text.replace(/[-+]?\\d+([.,]\\d+)?/g, '#');\nconst gesendet = context.get('gesendet') || {};\nfor (const s of Object.keys(gesendet)) if (jetzt - gesendet[s] > 86400000) delete gesendet[s];\nif (k.sperre_min > 0 && gesendet[schluessel] && jetzt - gesendet[schluessel] < k.sperre_min * 60000) {\n    node.status({ fill: 'grey', shape: 'ring', text: 'gesperrt: ' + e.text.slice(0, 40) });\n    return null;\n}\n\n// Nachtruhe: nur Fehler und Arten mit nachts: true gehen raus\nconst h = stundeBerlin(jetzt);\nconst von = zahl('MELDUNG_RUHE_VON', 22), bis = zahl('MELDUNG_RUHE_BIS', 7);\nconst ruhe = von > bis ? (h >= von || h < bis) : (h >= von && h < bis);\nif (ruhe && !k.nachts && e.stufe !== 'fehler') {\n    const nacht = global.get('meldung_nacht') || [];\n    if (!nacht.some(x => x.schluessel === schluessel)) nacht.push({ zeit: e.zeit, text: e.text, schluessel });\n    global.set('meldung_nacht', nacht.slice(-50));\n    node.status({ fill: 'blue', shape: 'ring', text: 'Nachtruhe, wartet: ' + e.text.slice(0, 40) });\n    return [null, { log: { stufe: 'info', bereich: 'meldung', text: 'Meldung wartet (Nachtruhe): ' + e.text } }];\n}\n\ngesendet[schluessel] = jetzt;\ncontext.set('gesendet', gesendet);\n\nconst topic = env.get('NTFY_TOPIC');\nif (!topic) {\n    node.status({ fill: 'grey', shape: 'dot', text: 'kein Kanal (NTFY_TOPIC leer): ' + e.text.slice(0, 40) });\n    return [null, { log: { stufe: 'info', bereich: 'meldung', text: 'Meldung ohne Kanal: ' + e.text } }];\n}\nconst server = (env.get('NTFY_SERVER') || 'https://ntfy.sh').replace(/\\/$/, '');\nnode.status({ fill: 'green', shape: 'dot', text: 'gesendet: ' + e.text.slice(0, 40) });\nreturn [\n    {\n        url: server, method: 'POST', headers: { 'Content-Type': 'application/json' },\n        payload: JSON.stringify({ topic, title: 'Radler-EMS: ' + k.titel, message: e.text, priority: k.prio }),\n    },\n    { log: { stufe: 'info', bereich: 'meldung', text: `Meldung gesendet (${art}): ${e.text}` } },\n];\n",
+  "outputs": 2,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "log-ntfy"
+   ],
+   [
+    "log-fn"
+   ]
+  ],
+  "x": 580,
+  "y": 1010,
+  "z": "tab-system",
+  "g": "grp-log"
+ },
+ {
+  "id": "log-ntfy",
+  "type": "http request",
+  "name": "ntfy senden",
+  "method": "POST",
+  "ret": "obj",
+  "paytoqs": "ignore",
+  "url": "",
+  "tls": "",
+  "persist": false,
+  "proxy": "",
+  "insecureHTTPParser": false,
+  "authType": "",
+  "senderr": false,
+  "headers": [],
+  "wires": [
+   []
+  ],
+  "x": 810,
+  "y": 1010,
+  "z": "tab-system",
+  "g": "grp-log"
+ },
+ {
+  "id": "log-puffer-inj",
+  "type": "inject",
+  "name": "alle 5 s",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "5",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "5",
+  "topic": "",
+  "wires": [
+   [
+    "log-puffer"
+   ]
+  ],
+  "x": 120,
+  "y": 1070,
+  "z": "tab-system",
+  "g": "grp-log"
+ },
+ {
+  "id": "log-puffer",
+  "type": "function",
+  "name": "Warnungen und Fehler (Node-RED-Log)",
+  "func": "// Warnungen und Fehler (Node-RED-Log) → Log\n// ─ Zweck: holt alle 5 s, was der Logger aus settings.js (deploy/settings-radler.js) gesammelt hat,\n//          damit node.warn/node.error aller Knoten im Log landen, ohne die Knoten zu ändern (R2.3).\n// ─ Eingang: Inject alle 5 s. Kontext: global.radlerLogPuffer (Array, von settings.js angelegt)\n// ─ Ausgang 1: je Eintrag eine Nachricht msg.log (Link → Log)\n// Knoten des Log-Bereichs selbst (IDs beginnen mit \"log-\") werden übergangen, sonst gäbe es eine Schleife.\n\nconst puffer = global.get('radlerLogPuffer');\nif (!Array.isArray(puffer)) {\n    node.status({ fill: 'grey', shape: 'ring', text: 'kein Puffer: Zusatz in settings.js fehlt' });\n    return null;\n}\nconst neu = puffer.splice(0, puffer.length);\nconst msgs = neu\n    .filter(e => !(e.id || '').startsWith('log-'))\n    .map(e => ({\n        log: {\n            stufe: e.level <= 20 ? 'fehler' : 'warnung',\n            bereich: 'node-red',\n            text: `${e.name || e.typ || e.id}: ${typeof e.text === 'string' ? e.text : JSON.stringify(e.text)}`.slice(0, 500),\n            daten: { id: e.id, tab: e.z },\n        },\n    }));\nconst gesamt = (context.get('gesamt') || 0) + msgs.length;\ncontext.set('gesamt', gesamt);\nnode.status({ fill: 'green', shape: 'dot', text: `${gesamt} übernommen` });\nreturn msgs.length ? [msgs] : null;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "log-fn"
+   ]
+  ],
+  "x": 350,
+  "y": 1070,
+  "z": "tab-system",
+  "g": "grp-log"
+ },
+ {
+  "id": "log-aufr-inj",
+  "type": "inject",
+  "name": "täglich 3:00",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "",
+  "crontab": "00 03 * * *",
+  "once": false,
+  "onceDelay": "5",
+  "topic": "",
+  "wires": [
+   [
+    "log-aufr"
+   ]
+  ],
+  "x": 120,
+  "y": 1130,
+  "z": "tab-system",
+  "g": "grp-log"
+ },
+ {
+  "id": "log-aufr",
+  "type": "exec",
+  "name": "Logdateien > 30 Tage löschen",
+  "command": "find ${LOG_VERZEICHNIS:-/home/pi/radler-ems/log} -name 'radler-ems-*.log' -mtime +30 -delete",
+  "addpay": "",
+  "append": "",
+  "useSpawn": "false",
+  "timer": "",
+  "winHide": false,
+  "oldrc": false,
+  "wires": [
+   [],
+   [],
+   []
+  ],
+  "x": 350,
+  "y": 1130,
+  "z": "tab-system",
+  "g": "grp-log"
+ },
+ {
+  "id": "grp-waechter",
+  "type": "group",
+  "z": "tab-system",
+  "name": "Geräte-Wächter",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-waechter-kom",
+   "sys-w-inj",
+   "sys-w",
+   "sys-w-log"
+  ],
+  "x": 14,
+  "y": 1240,
+  "w": 720,
+  "h": 170
+ },
+ {
+  "id": "grp-waechter-kom",
+  "type": "comment",
+  "name": "Jede Minute: liefert ein Gerät seit GERAET_OFFLINE_MIN keine Werte → Fehler mit Meldung, bei Rückkehr Entwarnung",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 1280,
+  "z": "tab-system",
+  "g": "grp-waechter"
+ },
+ {
+  "id": "sys-w-inj",
+  "type": "inject",
+  "name": "jede Minute",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "60",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "60",
+  "topic": "",
+  "wires": [
+   [
+    "sys-w"
+   ]
+  ],
+  "x": 120,
+  "y": 1340,
+  "z": "tab-system",
+  "g": "grp-waechter"
+ },
+ {
+  "id": "sys-w",
+  "type": "function",
+  "name": "Geräte prüfen",
+  "func": "// Geräte-Wächter: meldet Geräte, die keine Werte mehr liefern, und ihre Rückkehr\n// ─ Eingang: Inject jede Minute. Kontext: global.abbild\n// ─ Ausgang 1: msg.log (fehler mit melden 'geraet' bzw. info bei Rückkehr) → Log\n// ─ Umgebung: GERAET_OFFLINE_MIN (15), <GERÄT>_QUELLE (aus = nicht überwachen)\n\nconst SIGNALE = [\n    // [Signal, Name, Umgebungsvariable der Quelle, Grenze in Minuten (null = GERAET_OFFLINE_MIN)]\n    ['pv.leistung_W', 'PV-Wechselrichter', 'PV_QUELLE', null],\n    ['netz.bezug_W', 'Netzzähler', 'NETZ_QUELLE', null],\n    ['batterie.soc_pct', 'PV-Batterie', 'BATTERIE_QUELLE', null],\n    ['wallbox.status', 'Wallbox', 'WALLBOX_QUELLE', null],\n    ['wp.status', 'Wärmepumpe', 'WP_QUELLE', null],\n    ['markt.preise', 'Strompreise', null, 180],\n    ['prognose.pv', 'PV-Prognose', null, 180],\n];\n\nconst jetzt = Date.now();\nconst abbild = global.get('abbild') || {};\nconst grenzeStd = parseFloat(env.get('GERAET_OFFLINE_MIN')) || 15;\nconst start = global.get('radler_start') || jetzt;\nconst offline = context.get('offline') || {};\nconst msgs = [];\nconst fehlt = [];\n\nfor (const [signal, name, quelleVar, grenzeMin] of SIGNALE) {\n    if (quelleVar && (env.get(quelleVar) || 'simulator') === 'aus') continue;\n    const grenze = (grenzeMin || grenzeStd) * 60000;\n    const e = abbild[signal];\n    const alter = e ? jetzt - e.zeit : jetzt - start;\n    if (alter > grenze) {\n        fehlt.push(name);\n        if (!offline[signal]) {\n            offline[signal] = jetzt;\n            msgs.push({ log: { stufe: 'fehler', bereich: 'system', melden: 'geraet',\n                text: `${name} liefert seit ${Math.round(alter / 60000)} min keine Werte` } });\n        }\n    } else if (offline[signal]) {\n        msgs.push({ log: { stufe: 'info', bereich: 'system', melden: 'geraet',\n            text: `${name} wieder online (nach ${Math.round((jetzt - offline[signal]) / 60000)} min)` } });\n        delete offline[signal];\n    }\n}\ncontext.set('offline', offline);\nnode.status(fehlt.length\n    ? { fill: 'red', shape: 'dot', text: 'fehlt: ' + fehlt.join(', ') }\n    : { fill: 'green', shape: 'dot', text: 'alle Geräte liefern' });\nreturn msgs.length ? [msgs] : null;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "sys-w-log"
+   ]
+  ],
+  "x": 350,
+  "y": 1340,
+  "z": "tab-system",
+  "g": "grp-waechter"
+ },
+ {
+  "id": "sys-w-log",
+  "type": "link out",
+  "name": "→ Log",
+  "mode": "link",
+  "links": [
+   "log-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 1340,
+  "z": "tab-system",
+  "g": "grp-waechter"
+ },
+ {
+  "id": "grp-bericht",
+  "type": "group",
+  "z": "tab-system",
+  "name": "Tagesbericht",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-bericht-kom",
+   "sys-tb-inj",
+   "sys-tb-hand",
+   "sys-tb",
+   "sys-tb-db",
+   "sys-tb-log"
+  ],
+  "x": 14,
+  "y": 1450,
+  "w": 720,
+  "h": 230
+ },
+ {
+  "id": "grp-bericht-kom",
+  "type": "comment",
+  "name": "Um 7 Uhr für den Vortag: Stromkosten, Bezug, Einspeisung, PV, Auto, Netzladen; dazu nachts zurückgehaltene Meldungen",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 1490,
+  "z": "tab-system",
+  "g": "grp-bericht"
+ },
+ {
+  "id": "sys-tb-inj",
+  "type": "inject",
+  "name": "7:00",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "",
+  "crontab": "00 07 * * *",
+  "once": false,
+  "onceDelay": "5",
+  "topic": "",
+  "wires": [
+   [
+    "sys-tb"
+   ]
+  ],
+  "x": 120,
+  "y": 1550,
+  "z": "tab-system",
+  "g": "grp-bericht"
+ },
+ {
+  "id": "sys-tb-hand",
+  "type": "inject",
+  "name": "Von Hand: jetzt",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "",
+  "crontab": "",
+  "once": false,
+  "onceDelay": "5",
+  "topic": "",
+  "wires": [
+   [
+    "sys-tb"
+   ]
+  ],
+  "x": 120,
+  "y": 1610,
+  "z": "tab-system",
+  "g": "grp-bericht"
+ },
+ {
+  "id": "sys-tb",
+  "type": "function",
+  "name": "Tagesbericht",
+  "func": "// Tagesbericht (R5): um 7 Uhr für den Vortag\n// Ein Knoten für alle drei Schritte, unterschieden nach msg.schritt:\n//   (ohne)    → Abfrage 1 bauen: Netz, PV, Wallbox je Minute (Bucket geraete)\n//   'geraete' → Antwort merken, Abfrage 2 bauen: Strompreise (Bucket markt)\n//   'markt'   → Antwort merken, Abfrage 3 bauen: Netzladen der Strategie (Bucket ems)\n//   'ems'     → Bericht rechnen\n// ─ Ausgang 1: msg.query → \"InfluxDB lesen\" (dessen Antwort kommt wieder hierher)\n// ─ Ausgang 2: msg.log mit melden 'tagesbericht' → Log\n// ─ Umgebung: EINSPEISE_CT (8,0), ABGABEN_CT (nur als Rückfall, wenn kein Endpreis gespeichert ist)\n// ─ Kontext: global.meldung_nacht (wird angehängt und geleert)\n\nfunction mitternachtBerlin(t) {\n    // UTC-Zeitpunkt von 0 Uhr deutscher Zeit am Tag von t\n    const f = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit',\n        hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });\n    const p = Object.fromEntries(f.formatToParts(t).map(x => [x.type, x.value]));\n    const alsUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);\n    const versatz = alsUtc - Math.floor(t / 1000) * 1000;\n    return Date.UTC(+p.year, +p.month - 1, +p.day) - versatz;\n}\nconst fmt = (x, n = 1) => x.toFixed(n).replace('.', ',');\n\nif (!msg.schritt) {\n    const stop = mitternachtBerlin(Date.now());\n    const start = mitternachtBerlin(stop - 12 * 3600000);\n    msg.bericht = { start, stop };\n    msg.schritt = 'geraete';\n    msg.query = `from(bucket: \"geraete\")\n  |> range(start: ${new Date(start).toISOString()}, stop: ${new Date(stop).toISOString()})\n  |> filter(fn: (r) => (r._measurement == \"netz\" and r._field == \"bezug_W\") or\n                       (r._measurement == \"pv\" and r._field == \"leistung_W\") or\n                       (r._measurement == \"wallbox\" and r._field == \"leistung_W\"))\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\", \"_measurement\"])`;\n    return [msg, null];\n}\n\nconst b = msg.bericht;\nif (msg.schritt === 'geraete') {\n    b.geraete = Array.isArray(msg.payload) ? msg.payload : [];\n    msg.schritt = 'markt';\n    msg.query = `from(bucket: \"markt\")\n  |> range(start: ${new Date(b.start - 3600000).toISOString()}, stop: ${new Date(b.stop).toISOString()})\n  |> filter(fn: (r) => r._measurement == \"strompreis\" and r._field == \"preis_ct\")\n  |> keep(columns: [\"_time\", \"_value\"])`;\n    return [msg, null];\n}\nif (msg.schritt === 'markt') {\n    b.preise = Array.isArray(msg.payload) ? msg.payload : [];\n    msg.schritt = 'ems';\n    msg.query = `from(bucket: \"ems\")\n  |> range(start: ${new Date(b.start).toISOString()}, stop: ${new Date(b.stop).toISOString()})\n  |> filter(fn: (r) => r._measurement == \"ems_strategie\" and r._field == \"nl_laden\")\n  |> keep(columns: [\"_time\", \"_value\"])`;\n    return [msg, null];\n}\n\n// Schritt 'ems': rechnen\nconst nl = Array.isArray(msg.payload) ? msg.payload : [];\nconst einspeiseCt = parseFloat(env.get('EINSPEISE_CT')) || 8.0;\nconst preise = b.preise.map(r => [new Date(r._time).getTime(), r._value]).sort((x, y) => x[0] - y[0]);\nfunction preisZu(t) {\n    // letzter bekannter Preis vor t (Viertelstunden)\n    let p = null;\n    for (const [tp, v] of preise) { if (tp <= t) p = v; else break; }\n    return p;\n}\nlet bezug = 0, einspeisung = 0, kosten = 0, pv = 0, auto = 0, ohnePreis = 0;\nfor (const r of b.geraete) {\n    const t = new Date(r._time).getTime() - 60000; // aggregateWindow stempelt das Ende der Minute\n    const kWh = r._value / 60000;\n    if (r._measurement === 'netz') {\n        if (kWh > 0) {\n            bezug += kWh;\n            const p = preisZu(t);\n            if (p === null) ohnePreis += kWh; else kosten += kWh * p / 100;\n        } else {\n            einspeisung -= kWh;\n            kosten += kWh * einspeiseCt / 100;\n        }\n    } else if (r._measurement === 'pv') pv += Math.max(0, kWh);\n    else if (r._measurement === 'wallbox') auto += Math.max(0, kWh);\n}\nconst nlStunden = nl.filter(r => r._value >= 1).length * 0.25;\nconst datum = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit' }).format(b.start);\nlet text = `📊 Tagesbericht ${datum}.: Strom ${fmt(kosten, 2)} € (Bezug ${fmt(bezug)} kWh, Einspeisung ${fmt(einspeisung)} kWh)` +\n    ` · PV ${fmt(pv)} kWh · Auto ${fmt(auto)} kWh · Netzladen ${fmt(nlStunden, 2)} h`;\nif (ohnePreis > 0.05) text += ` (${fmt(ohnePreis)} kWh ohne Preis)`;\nconst nacht = global.get('meldung_nacht') || [];\nif (nacht.length) text += '\\nNachts zurückgehalten:\\n' + nacht.map(x => '· ' + x.text).join('\\n');\nglobal.set('meldung_nacht', []);\nnode.status({ fill: 'green', shape: 'dot', text: text.slice(0, 60) });\nreturn [null, { log: { stufe: 'info', bereich: 'system', melden: 'tagesbericht', text,\n    daten: { kosten_eur: +kosten.toFixed(2), bezug_kWh: +bezug.toFixed(2), einspeisung_kWh: +einspeisung.toFixed(2),\n             pv_kWh: +pv.toFixed(2), auto_kWh: +auto.toFixed(2), netzladen_h: nlStunden } } }];\n",
+  "outputs": 2,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "sys-tb-db"
+   ],
+   [
+    "sys-tb-log"
+   ]
+  ],
+  "x": 350,
+  "y": 1550,
+  "z": "tab-system",
+  "g": "grp-bericht"
+ },
+ {
+  "id": "sys-tb-db",
+  "type": "influxdb in",
+  "influxdb": "influx-radler",
+  "name": "InfluxDB lesen",
+  "query": "",
+  "rawOutput": false,
+  "precision": "",
+  "retentionPolicy": "",
+  "org": "home",
+  "wires": [
+   [
+    "sys-tb"
+   ]
+  ],
+  "x": 580,
+  "y": 1550,
+  "z": "tab-system",
+  "g": "grp-bericht"
+ },
+ {
+  "id": "sys-tb-log",
+  "type": "link out",
+  "name": "→ Log",
+  "mode": "link",
+  "links": [
+   "log-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 1610,
+  "z": "tab-system",
+  "g": "grp-bericht"
+ },
+ {
+  "id": "tab-ems",
+  "type": "tab",
+  "label": "⚡ EMS",
+  "disabled": false,
+  "info": "Strategie (15 min): Netzladen nach Vorschau, Wasserlinie, Plan für Wallbox und Wärmepumpe.\nAusführung (10 s): einziger Schreiber an die PV-Batterie.\n\nSiehe docs/ems.md."
+ },
+ {
+  "id": "grp-lastprofil",
+  "type": "group",
+  "z": "tab-ems",
+  "name": "Lastprofil",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-lastprofil-kom",
+   "ems-lp-inj",
+   "ems-lp",
+   "ems-lp-db"
+  ],
+  "x": 14,
+  "y": 40,
+  "w": 720,
+  "h": 170
+ },
+ {
+  "id": "grp-lastprofil-kom",
+  "type": "comment",
+  "name": "Stündlich: Hausverbrauch ohne Auto je Uhrzeit, Mittel der letzten 14 Tage (InfluxDB)",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 80,
+  "z": "tab-ems",
+  "g": "grp-lastprofil"
+ },
+ {
+  "id": "ems-lp-inj",
+  "type": "inject",
+  "name": "stündlich",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "3600",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "15",
+  "topic": "",
+  "wires": [
+   [
+    "ems-lp"
+   ]
+  ],
+  "x": 120,
+  "y": 140,
+  "z": "tab-ems",
+  "g": "grp-lastprofil"
+ },
+ {
+  "id": "ems-lp",
+  "type": "function",
+  "name": "Lastprofil",
+  "func": "// Lastprofil: mittlerer Hausverbrauch ohne Auto je Uhrzeit (deutsche Zeit), letzte 14 Tage\n// Zwei Schritte in einem Knoten:\n//   msg.schritt fehlt  → Abfrage bauen (Ausgang 1 → \"InfluxDB lesen\", die Antwort kommt mit msg.schritt = 'antwort' zurück)\n//   msg.schritt = 'antwort' → auswerten\n// ─ Kontext: global.ems_lastprofil = { werte: [24 × W], tage, zeit }\n// Warum Mittelwert und 14 Tage: In Haus-EMS über 60 Tage rückgerechnet. Der Median übersieht die Blöcke der\n// Wärmepumpe, der Mittelwert enthält sie (docs/ems.md, „Lastprofil“).\n// Ist die InfluxDB nicht erreichbar, bleibt das letzte Profil stehen (R1.6).\n\nif (msg.schritt !== 'antwort') {\n    msg.schritt = 'antwort';\n    msg.query = `from(bucket: \"geraete\")\n  |> range(start: -14d)\n  |> filter(fn: (r) => r._measurement == \"haus\" and r._field == \"ohne_auto_W\")\n  |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])`;\n    return [msg, null];\n}\n\nconst zeilen = Array.isArray(msg.payload) ? msg.payload : [];\nconst stunde = t => parseInt(new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: 'numeric', hourCycle: 'h23' }).format(t), 10);\nconst summe = new Array(24).fill(0), anzahl = new Array(24).fill(0);\nconst tage = new Set();\nfor (const z of zeilen) {\n    // aggregateWindow stempelt das Ende der Stunde\n    const t = new Date(z._time).getTime() - 3600000;\n    const h = stunde(t);\n    summe[h] += z._value;\n    anzahl[h]++;\n    tage.add(new Date(t).toISOString().slice(0, 10));\n}\nconst alt = global.get('ems_lastprofil');\nconst standard = parseFloat(env.get('LAST_STANDARD_W')) || 500;\nconst besetzt = anzahl.filter(n => n > 0).length;\nif (tage.size < 2 || besetzt < 20) {\n    // zu wenig Daten: feste Annahme, bis genug gesammelt ist\n    const profil = { werte: new Array(24).fill(standard), tage: tage.size, zeit: Date.now(), quelle: 'Standard' };\n    global.set('ems_lastprofil', profil);\n    node.status({ fill: 'yellow', shape: 'ring', text: `zu wenig Daten (${tage.size} Tage), fest ${standard} W` });\n    return [null, profil];\n}\nconst werte = summe.map((s, h) => Math.round(anzahl[h] ? s / anzahl[h] : (alt ? alt.werte[h] : standard)));\nconst profil = { werte, tage: tage.size, zeit: Date.now(), quelle: 'InfluxDB' };\nglobal.set('ems_lastprofil', profil);\nconst tagWh = werte.reduce((a, b) => a + b, 0);\nnode.status({ fill: 'green', shape: 'dot', text: `${tage.size} Tage · ${(tagWh / 1000).toFixed(1)} kWh/Tag · max ${Math.max(...werte)} W` });\nreturn [null, profil];\n",
+  "outputs": 2,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "ems-lp-db"
+   ],
+   []
+  ],
+  "x": 350,
+  "y": 140,
+  "z": "tab-ems",
+  "g": "grp-lastprofil"
+ },
+ {
+  "id": "ems-lp-db",
+  "type": "influxdb in",
+  "influxdb": "influx-radler",
+  "name": "InfluxDB lesen",
+  "query": "",
+  "rawOutput": false,
+  "precision": "",
+  "retentionPolicy": "",
+  "org": "home",
+  "wires": [
+   [
+    "ems-lp"
+   ]
+  ],
+  "x": 580,
+  "y": 140,
+  "z": "tab-ems",
+  "g": "grp-lastprofil"
+ },
+ {
+  "id": "grp-strategie",
+  "type": "group",
+  "z": "tab-ems",
+  "name": "Strategie",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-strategie-kom",
+   "ems-st-inj",
+   "ems-st",
+   "ems-st-db",
+   "ems-st-log"
+  ],
+  "x": 14,
+  "y": 250,
+  "w": 720,
+  "h": 230
+ },
+ {
+  "id": "grp-strategie-kom",
+  "type": "comment",
+  "name": "Alle 15 min: Netzladen (Vorschau), Wasserlinie, Preise für Wallbox und Wärmepumpe → InfluxDB „ems_strategie“",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 290,
+  "z": "tab-ems",
+  "g": "grp-strategie"
+ },
+ {
+  "id": "ems-st-inj",
+  "type": "inject",
+  "name": "alle 15 min",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "900",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "25",
+  "topic": "",
+  "wires": [
+   [
+    "ems-st"
+   ]
+  ],
+  "x": 120,
+  "y": 350,
+  "z": "tab-ems",
+  "g": "grp-strategie"
+ },
+ {
+  "id": "ems-st",
+  "type": "function",
+  "name": "Strategie",
+  "func": "// ⚡ EMS-Strategie (alle 15 min): Netzladen (Vorschau), Wasserlinie, Plan für Wallbox und Wärmepumpe\n// Übernommen aus Haus-EMS (docs/ems.md), vereinfacht auf eine PV-Batterie.\n// ─ Eingang: Inject alle 15 min (und 20 s nach dem Start)\n// ─ Ausgang 1: InfluxDB-Punkt (Bucket ems, Messreihe \"ems_strategie\")\n// ─ Ausgang 2: msg.log, nur bei geänderter Entscheidung\n// ─ Liest: global.abbild (batterie.soc_pct, netz.bezug_W, wallbox.leistung_W, markt.preise, prognose.pv),\n//          global.ems_lastprofil, global.ems_live\n// ─ Schreibt: global.ems_nl (Netzladen), global.ems_wl (Wasserlinie), global.ems_plan (Preise für Wallbox und\n//            Wärmepumpe), global.ems_haus (teuer: Strom jetzt teurer als bis zur nächsten Sonne)\n// ─ Umgebung: BATTERIE_KAPAZITAET_WH, BATTERIE_MAX_W, BATTERIE_MIN_SOC, LAST_STANDARD_W,\n//             NL_MODUS, NL_WIRKUNGSGRAD, NL_AUFSCHLAG_CT, NL_LAST_FAKTOR, NL_PV_FAKTOR, NL_MIN_KWH, NL_SOC_MAX, NL_LEISTUNG_W,\n//             WL_MODUS, WL_RESERVE, WL_LETZTE_H, WL_PV_FAKTOR\n\nconst jetzt = Date.now();\nconst abbild = global.get('abbild') || {};\nfunction wert(s, maxS) { const e = abbild[s]; return e && jetzt - e.zeit <= maxS * 1000 ? e.wert : null; }\nfunction zahl(n, std) { const v = parseFloat(env.get(n)); return isNaN(v) ? std : v; }\nfunction text(n, std) { const v = env.get(n); return v === undefined || v === null || v === '' ? std : String(v); }\nconst stunde = t => parseInt(new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: 'numeric', hourCycle: 'h23' }).format(t), 10);\nconst kWh = wh => (wh / 1000).toFixed(1).replace('.', ',');\nconst ct = x => x.toFixed(1).replace('.', ',');\n\nconst cap = zahl('BATTERIE_KAPAZITAET_WH', 10000);\nconst maxW = zahl('BATTERIE_MAX_W', 5000);\nconst socMin = zahl('BATTERIE_MIN_SOC', 10);\nconst soc = wert('batterie.soc_pct', 300);\nconst netz = wert('netz.bezug_W', 600);\nconst wb = wert('wallbox.leistung_W', 600) || 0;\nconst live = global.get('ems_live');\nconst liveFrisch = live && jetzt - live.zeit < 120000;\n\n// Preise ab der laufenden Stunde (Endpreis inkl. Abgaben), höchstens 3 h alt\nconst h0 = Math.floor(jetzt / 3600000) * 3600000;\nconst preisE = abbild['markt.preise'];\nconst preise = (preisE && jetzt - preisE.zeit < 3 * 3600000 ? preisE.wert : []).filter(p => p.t >= h0);\nconst preisJetzt = preise.length && preise[0].t === h0 ? preise[0].ct : null;\nconst mittel = preise.length ? preise.reduce((a, p) => a + p.ct, 0) / preise.length : null;\nconst preisZu = t => { const p = preise.find(x => x.t === t); return p ? p.ct : mittel; };\n\n// PV-Prognose (W je Stunde) und Lastprofil (W je Uhrzeit, ohne Auto)\nconst progE = abbild['prognose.pv'];\nconst prog = {};\nif (progE && jetzt - progE.zeit < 6 * 3600000) for (const x of progE.wert) prog[x.t] = x.W;\nconst hatPrognose = Object.keys(prog).length > 0;\nconst pvH = t => prog[t] || 0;\nconst profil = global.get('ems_lastprofil');\nconst lastStd = zahl('LAST_STANDARD_W', 500);\nconst last = t => (profil ? profil.werte[stunde(t)] : lastStd);\nconst uhr = t => stunde(t) + ' Uhr';\nconst ueberschussJetzt = liveFrisch ? live.ueberschuss_W : (netz !== null ? Math.max(0, -netz) : 0);\n\n// ───────────── 1. Netzladen: Vorschau ─────────────\n// „Fehlt dem Akku Energie, bevor der Strom wieder billiger wird?“ (Haus-EMS seit 9.11.2026)\nconst NL = {\n    modus: text('NL_MODUS', 'vorschau'), eta: zahl('NL_WIRKUNGSGRAD', 0.85), auf: zahl('NL_AUFSCHLAG_CT', 4),\n    lastF: zahl('NL_LAST_FAKTOR', 1.2), pvF: zahl('NL_PV_FAKTOR', 0.9), minWh: zahl('NL_MIN_KWH', 1) * 1000,\n    socMax: zahl('NL_SOC_MAX', 95), leistung: zahl('NL_LEISTUNG_W', Math.min(maxW, 3000)),\n};\nlet nlLaden = false, nlBedarf = 0, nlGrund;\nif (NL.modus === 'aus') nlGrund = 'Netzladen aus';\nelse if (soc === null) nlGrund = 'Ladestand unbekannt';\nelse if (preisJetzt === null) nlGrund = 'keine Preise';\nelse if (ueberschussJetzt >= 150) nlGrund = `PV-Überschuss ${Math.round(ueberschussJetzt)} W`;\nelse {\n    const etaL = Math.sqrt(NL.eta), etaE = Math.sqrt(NL.eta); // je Richtung\n    const voll = (100 - socMin) / 100 * cap;\n    let inhalt = Math.max(0, (soc - socMin) / 100 * cap);\n    // Grenze: eine Stunde lohnt nur, wenn sie nach Verlusten plus Aufschlag (Abstand, Verschleiß) teurer ist\n    const grenze = preisJetzt / NL.eta + NL.auf;\n    let erste = null, ende = 'nichts fehlt in 24 h', maxNichtLohnend = null;\n    for (let i = 0; i < 24; i++) {\n        const t = h0 + i * 3600000;\n        const anteil = i === 0 ? (h0 + 3600000 - jetzt) / 3600000 : 1;\n        const preis = preisZu(t);\n        if (i > 0 && preis < preisJetzt - 0.5) { ende = `billiger in ${i} h (${ct(preis)} ct)`; break; }\n        const netto = (pvH(t) * NL.pvF - last(t) * NL.lastF) * anteil;\n        if (netto > 0) {\n            inhalt = Math.min(voll, inhalt + netto * etaL);\n            if (i > 0 && inhalt >= voll * 0.99) { ende = `Sonne füllt den Akku in ${i} h`; break; }\n            continue;\n        }\n        const braucht = Math.min(-netto, maxW * anteil);\n        const aus = Math.min(inhalt * etaE, braucht);\n        inhalt -= aus / etaE;\n        const fehl = braucht - aus;\n        if (fehl > 1) {\n            if (preis >= grenze) { nlBedarf += fehl; if (erste === null) erste = t; }\n            else maxNichtLohnend = Math.max(maxNichtLohnend === null ? 0 : maxNichtLohnend, preis);\n        }\n    }\n    const frei = Math.max(0, (NL.socMax - soc) / 100 * cap);\n    if (nlBedarf <= 0) {\n        nlGrund = maxNichtLohnend !== null\n            ? `fehlt, lohnt nicht (höchstens ${ct(maxNichtLohnend)} < ${ct(grenze)} ct); ${ende}` : ende;\n    } else if (nlBedarf < NL.minWh) nlGrund = `${kWh(nlBedarf)} kWh fehlen, weniger als ${kWh(NL.minWh)} kWh`;\n    else if (frei < NL.minWh) nlGrund = `Akku fast voll (frei ${kWh(frei)} kWh)`;\n    else {\n        nlLaden = true;\n        nlGrund = `Vorschau: es fehlen ${kWh(nlBedarf)} kWh in Stunden ≥ ${ct(grenze)} ct, fehlt ab ${uhr(erste)}` +\n            (ende !== 'nichts fehlt in 24 h' ? `, dann ${ende}` : '');\n        // Auto und Akku nicht gleichzeitig: gibt es vor der ersten Fehlstunde genug Stunden, die höchstens\n        // 1 ct teurer sind als jetzt, wartet der Akku (Haus-EMS seit 12.11.2026)\n        if (wb > 5000) {\n            const noetig = Math.ceil(Math.min(nlBedarf, frei) / NL.leistung);\n            const andere = preise.filter(p => p.t > h0 && p.t < erste && p.ct <= preisJetzt + 1).sort((a, b) => a.ct - b.ct);\n            if (andere.length >= noetig) {\n                nlLaden = false;\n                nlGrund = `Auto lädt (${kWh(wb)} kW), Akku lädt später (${andere.slice(0, noetig).map(p => uhr(p.t)).join(', ')})`;\n            }\n        }\n    }\n}\nconst nl = {\n    laden: NL.modus === 'vorschau' && nlLaden, berechnet: nlLaden, modus: NL.modus, bedarf_Wh: Math.round(nlBedarf),\n    leistung_W: NL.leistung, grund: nlGrund, zeit: jetzt, bis: jetzt + 20 * 60000,\n};\nglobal.set('ems_nl', nl);\n\n// ───────────── 2. Wasserlinie (Spitzenkappung) ─────────────\n// Dieselbe Energie in den Akku, aber aus der Mittagsspitze: Ladeleistung = Überschuss über der Schwelle T\nconst WL = { modus: text('WL_MODUS', 'beobachten'), reserve: zahl('WL_RESERVE', 1.0), letzteH: zahl('WL_LETZTE_H', 1),\n    pvF: zahl('WL_PV_FAKTOR', 1.0) };\nlet wlT = 0, wlGrund, wlBedarf = 0, wlErwartet = 0, wlKorr = 1;\nif (WL.modus === 'aus') wlGrund = 'aus';\nelse if (soc === null) wlGrund = 'Ladestand unbekannt';\nelse if (!hatPrognose) wlGrund = 'keine Prognose';\nelse {\n    const ue = [];\n    for (let i = 0; i < 12; i++) {\n        const t = h0 + i * 3600000;\n        ue.push({ t, W: Math.max(0, pvH(t) * WL.pvF - last(t)), anteil: i === 0 ? (h0 + 3600000 - jetzt) / 3600000 : 1 });\n    }\n    // Tageskorrektur: bleibt der echte Überschuss hinter der Erwartung, wird der Rest kleiner angesetzt\n    if (liveFrisch && ue[0].W > 300) wlKorr = Math.min(1, Math.max(0.3, live.ueberschuss_W / ue[0].W));\n    for (const x of ue) x.W *= wlKorr;\n    wlBedarf = (100 - soc) / 100 * cap / 0.95 * WL.reserve;\n    wlErwartet = ue.reduce((a, x) => a + Math.min(x.W, maxW) * x.anteil, 0);\n    const mitUe = ue.filter(x => x.W > 200);\n    if (wlBedarf < 100) wlGrund = 'Akku voll';\n    else if (!mitUe.length) wlGrund = 'kein Überschuss erwartet';\n    else if (mitUe.length <= WL.letzteH) wlGrund = 'letzte Stunde mit Überschuss';\n    else if (wlErwartet <= wlBedarf) wlGrund = 'zu wenig Sonne erwartet';\n    else {\n        const menge = T => ue.reduce((a, x) => a + Math.min(Math.max(x.W - T, 0), maxW) * x.anteil, 0);\n        let lo = 0, hi = Math.max(...ue.map(x => x.W));\n        for (let k = 0; k < 30; k++) { const mid = (lo + hi) / 2; if (menge(mid) >= wlBedarf) lo = mid; else hi = mid; }\n        wlT = Math.floor(lo / 50) * 50;\n        wlGrund = `Akku braucht ${kWh(wlBedarf)} kWh, erwartet ${kWh(wlErwartet)} kWh`;\n    }\n}\nconst wl = { T_W: wlT, modus: WL.modus, grund: wlGrund, bedarf_Wh: Math.round(wlBedarf), erwartet_Wh: Math.round(wlErwartet),\n    korrektur: +wlKorr.toFixed(2), zeit: jetzt };\nglobal.set('ems_wl', wl);\n\n// ───────────── 3. Plan für Wallbox und Wärmepumpe ─────────────\nlet sonneAb = null;\nfor (let i = 1; i < 24; i++) { const t = h0 + i * 3600000; if (pvH(t) * 0.9 >= last(t)) { sonneAb = t; break; } }\nconst bisSonne = preise.filter(p => p.t >= h0 && (sonneAb === null || p.t < sonneAb));\nconst mittelBisSonne = bisSonne.length ? bisSonne.reduce((a, p) => a + p.ct, 0) / bisSonne.length : null;\nconst teuer = preisJetzt !== null && mittelBisSonne !== null && preisJetzt > mittelBisSonne;\nglobal.set('ems_haus', { teuer, mittel_bis_sonne_ct: mittelBisSonne, zeit: jetzt });\nlet pv12 = 0;\nfor (let i = 0; i < 12; i++) pv12 += pvH(h0 + i * 3600000);\nglobal.set('ems_plan', { zeit: jetzt, preise, preis_jetzt: preisJetzt, mittel, pv12h_Wh: Math.round(pv12), ohne_preise: !preise.length });\n\n// ───────────── Protokoll und Log ─────────────\nconst fields = {\n    nl_laden: nl.laden ? 1 : 0, nl_berechnet: nlLaden ? 1 : 0, nl_bedarf_Wh: nl.bedarf_Wh, nl_grund: nlGrund, nl_modus: NL.modus,\n    wl_T_W: wlT, wl_bedarf_Wh: wl.bedarf_Wh, wl_erwartet_Wh: wl.erwartet_Wh, wl_grund: wlGrund, wl_modus: WL.modus,\n    wl_korrektur: wl.korrektur, haus_teuer: teuer ? 1 : 0, pv12h_Wh: Math.round(pv12),\n    lastprofil_tage: profil ? profil.tage : 0,\n};\nif (preisJetzt !== null) fields.preis_ct = preisJetzt;\nif (mittel !== null) fields.mittel_ct = +mittel.toFixed(2);\nif (soc !== null) fields.soc = soc;\n\nconst logs = [];\nconst vorher = context.get('vorher') || {};\nif (vorher.nl !== nlLaden) {\n    logs.push({ log: { stufe: 'info', bereich: 'ems',\n        text: (nlLaden ? 'Netzladen ' + (nl.laden ? 'startet' : '(nur berechnet, NL_MODUS=' + NL.modus + ')') : 'kein Netzladen') + ': ' + nlGrund,\n        daten: { soc, preis_ct: preisJetzt, bedarf_Wh: nl.bedarf_Wh } } });\n}\nif ((vorher.wl > 0) !== (wlT > 0)) {\n    logs.push({ log: { stufe: 'info', bereich: 'ems',\n        text: wlT > 0 ? `Wasserlinie ${wlT} W (${WL.modus}): ${wlGrund}` : `Wasserlinie aus: ${wlGrund}` } });\n}\ncontext.set('vorher', { nl: nlLaden, wl: wlT });\n\nnode.status({ fill: nl.laden ? 'blue' : 'green', shape: 'dot',\n    text: `${preisJetzt !== null ? ct(preisJetzt) + ' ct' : 'ohne Preis'} · SoC ${soc ?? '–'} % · NL: ${nlLaden ? 'laden' : 'nein'} · WL ${wlT} W` });\nreturn [{ payload: [{ measurement: 'ems_strategie', tags: { quelle: 'ems' }, fields, timestamp: new Date(jetzt) }] },\n        logs.length ? logs : null];\n",
+  "outputs": 2,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "ems-st-db"
+   ],
+   [
+    "ems-st-log"
+   ]
+  ],
+  "x": 350,
+  "y": 350,
+  "z": "tab-ems",
+  "g": "grp-strategie"
+ },
+ {
+  "id": "ems-st-db",
+  "type": "link out",
+  "name": "→ Influx ems",
+  "mode": "link",
+  "links": [
+   "sys-db-ems-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 350,
+  "z": "tab-ems",
+  "g": "grp-strategie"
+ },
+ {
+  "id": "ems-st-log",
+  "type": "link out",
+  "name": "→ Log",
+  "mode": "link",
+  "links": [
+   "log-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 410,
+  "z": "tab-ems",
+  "g": "grp-strategie"
+ },
+ {
+  "id": "grp-ausfuehrung",
+  "type": "group",
+  "z": "tab-ems",
+  "name": "Ausführung",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-ausfuehrung-kom",
+   "ems-af-inj",
+   "ems-af",
+   "ems-af-bat",
+   "ems-af-db",
+   "ems-af-log"
+  ],
+  "x": 14,
+  "y": 520,
+  "w": 720,
+  "h": 290
+ },
+ {
+  "id": "grp-ausfuehrung-kom",
+  "type": "comment",
+  "name": "Alle 10 s: Befehl an die PV-Batterie (Netzladen → Auto lädt → Wasserlinie → Eigenverbrauch), Überschuss für WP und Auto",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 560,
+  "z": "tab-ems",
+  "g": "grp-ausfuehrung"
+ },
+ {
+  "id": "ems-af-inj",
+  "type": "inject",
+  "name": "alle 10 s",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "10",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "30",
+  "topic": "",
+  "wires": [
+   [
+    "ems-af"
+   ]
+  ],
+  "x": 120,
+  "y": 620,
+  "z": "tab-ems",
+  "g": "grp-ausfuehrung"
+ },
+ {
+  "id": "ems-af",
+  "type": "function",
+  "name": "Ausführung",
+  "func": "// ⚡ EMS-Ausführung (alle 10 s): einziger Schreiber an die PV-Batterie\n// Übernommen aus Haus-EMS (docs/ems.md, „Ausführung“), für eine Batterie, die sich selbst auf Eigenverbrauch regelt.\n// ─ Eingang: Inject alle 10 s\n// ─ Ausgang 1: Befehl an die Batterie (msg.befehl) → Link „Befehl Batterie“, nur bei Änderung oder alle 60 s\n// ─ Ausgang 2: InfluxDB-Punkt (Bucket ems, Messreihe \"ems_ausfuehrung\"), alle 30 s und bei Änderung\n// ─ Ausgang 3: msg.log bei geändertem Modus\n// ─ Liest: global.abbild, global.ems_nl, global.ems_wl, global.ems_haus, global.wallbox_plan\n// ─ Schreibt: global.ems_live (Überschuss, Mittel 5 min; für die Wärmepumpe),\n//            global.ems_ueberschuss (für das PV-Laden des Autos, Mittel 1 min)\n// ─ Umgebung: EMS_MODUS (aus | beobachten | aktiv), HA_MODUS, BATTERIE_MAX_W, BATTERIE_VOLL_SOC\n//\n// Befehle an die Batterie (docs/geraete-adapter.md):\n//   { modus: 'eigenverbrauch' }                                   Gerät regelt selbst auf 0 W am Netz\n//   { modus: 'laden', leistung_W }                                aus dem Netz laden (Netzladen)\n//   { modus: 'begrenzt', max_laden_W, max_entladen_W }            Eigenverbrauch mit Grenzen (null = keine)\n// Rangfolge: Netzladen → Auto lädt → Wasserlinie → Eigenverbrauch\n\nconst jetzt = Date.now();\nconst abbild = global.get('abbild') || {};\nfunction wert(s, maxS) { const e = abbild[s]; return e && jetzt - e.zeit <= maxS * 1000 ? e.wert : null; }\nfunction zahl(n, std) { const v = parseFloat(env.get(n)); return isNaN(v) ? std : v; }\nfunction text(n, std) { const v = env.get(n); return v === undefined || v === null || v === '' ? std : String(v); }\nfunction mittel(schluessel, wert, fensterMs) {\n    // gleitendes Mittel im Knotenkontext\n    const r = (context.get(schluessel) || []).filter(x => jetzt - x[0] <= fensterMs);\n    r.push([jetzt, wert]);\n    context.set(schluessel, r);\n    return r.reduce((a, x) => a + x[1], 0) / r.length;\n}\nconst rund100 = w => Math.max(0, Math.round(w / 100) * 100);\n\nconst modusEms = text('EMS_MODUS', 'beobachten');\nconst haModus = text('HA_MODUS', 'aktiv');\nconst maxW = zahl('BATTERIE_MAX_W', 5000);\nconst vollSoc = zahl('BATTERIE_VOLL_SOC', 99);\n\nconst netz = wert('netz.bezug_W', 60);           // > 0 Bezug, < 0 Einspeisung\nconst batt = wert('batterie.leistung_W', 60);    // > 0 Entladen, < 0 Laden\nconst soc = wert('batterie.soc_pct', 300);\nconst pv = wert('pv.leistung_W', 60) || 0;\nconst wb = wert('wallbox.leistung_W', 120) || 0;\nconst hausOhneAuto = wert('haus.ohne_auto_W', 60);\n\nconst plan = global.get('wallbox_plan');\nconst pvLaden = !!(plan && plan.regel === 'pv' && jetzt - plan.zeit < 180000);\n\nlet befehl, grund, S = 0, frei = 0;\nif (modusEms === 'aus') {\n    befehl = { modus: 'eigenverbrauch' }; grund = 'EMS aus';\n} else if (netz === null || batt === null) {\n    // Fail-Safe: ohne Messwerte regelt die Batterie selbst\n    befehl = { modus: 'eigenverbrauch' }; grund = 'Fail-Safe: Messwerte fehlen';\n} else {\n    const einspeisung = Math.max(0, -netz);\n    const battLaden = Math.max(0, -batt), battEntladen = Math.max(0, batt);\n    // Überschuss: was eingespeist oder schon in den Akku geladen wird (+ Auto, wenn es mit PV lädt)\n    S = einspeisung + battLaden + (pvLaden ? wb : 0);\n    // frei: Einspeisung minus Akku-Entladung (Akku-Strom ist kein Überschuss), Bezug negativ\n    frei = -netz - battEntladen;\n\n    const nl = global.get('ems_nl');\n    const wl = global.get('ems_wl');\n    const haus = global.get('ems_haus');\n    if (nl && nl.laden && jetzt < nl.bis) {\n        befehl = { modus: 'laden', leistung_W: nl.leistung_W }; grund = 'Netzladen';\n    } else if (wb > 1000) {\n        // Auto lädt aus dem Netz, nicht aus dem Akku. Mit HA_MODUS=aktiv deckt der Akku den Hausverbrauch ohne\n        // Auto (150 W Abstand), beim PV-Laden immer, sonst nur, wenn der Strom jetzt teuer ist.\n        const hausDecken = haModus === 'aktiv' && (pvLaden || (haus && haus.teuer)) && hausOhneAuto !== null;\n        if (hausDecken) {\n            befehl = { modus: 'begrenzt', max_laden_W: null, max_entladen_W: rund100(hausOhneAuto - pv - 150) };\n            grund = `Auto lädt, Akku deckt nur das Haus (${pvLaden ? 'PV-Laden' : 'Strom teuer'})`;\n        } else {\n            befehl = { modus: 'begrenzt', max_laden_W: null, max_entladen_W: 0 };\n            grund = 'Auto lädt, Akku entlädt nicht';\n        }\n    } else if (wl && wl.modus === 'aktiv' && wl.T_W > 0 && jetzt - wl.zeit < 20 * 60000 && S >= 100) {\n        befehl = { modus: 'begrenzt', max_laden_W: rund100(S - wl.T_W), max_entladen_W: null };\n        grund = `Wasserlinie ${wl.T_W} W`;\n    } else {\n        befehl = { modus: 'eigenverbrauch' }; grund = 'Eigenverbrauch';\n    }\n}\n\n// Überschuss für Wärmepumpe (5 min) und Auto (1 min)\nconst sMittel5 = mittel('s5', S, 300000);\nconst freiMittel5 = mittel('f5', frei, 300000);\nglobal.set('ems_live', { ueberschuss_W: Math.round(sMittel5), frei_W: Math.round(freiMittel5),\n    laden_W: Math.max(0, -(batt || 0)), soc, zeit: jetzt });\n// Anteil des Akkus am Überschuss: was er (noch) aufnehmen darf. Der Rest geht ans Auto (300 W Abstand).\nlet akkuAnteil = soc !== null && soc < vollSoc ? Math.min(S, maxW) : 0;\nif (befehl.modus === 'begrenzt' && befehl.max_laden_W !== null) akkuAnteil = Math.min(akkuAnteil, befehl.max_laden_W);\nconst autoW = mittel('a1', Math.max(0, S - akkuAnteil - 300), 60000);\nglobal.set('ems_ueberschuss', { car_W: Math.round(autoW), zeit: jetzt });\n\n// Senden: bei Änderung (Grenzen ab 100 W Unterschied) oder alle 60 s; im Modus beobachten nie\nconst letzter = context.get('letzter') || {};\nconst gleich = letzter.befehl && letzter.befehl.modus === befehl.modus &&\n    ['leistung_W', 'max_laden_W', 'max_entladen_W'].every(k => {\n        const a = letzter.befehl[k], b = befehl[k];\n        return (a === undefined || a === null) ? (b === undefined || b === null) : (b !== null && b !== undefined && Math.abs(a - b) < 100);\n    });\nconst senden = modusEms === 'aktiv' && (!gleich || jetzt - (letzter.gesendet || 0) >= 60000);\nconst out1 = senden ? { befehl: Object.assign({ grund, zeit: jetzt }, befehl) } : null;\nif (senden) letzter.gesendet = jetzt;\n\nconst logs = [];\nif (letzter.grund !== grund) {\n    logs.push({ log: { stufe: grund.startsWith('Fail-Safe') ? 'fehler' : 'info', bereich: 'batterie',\n        text: `Batterie: ${grund}` + (modusEms !== 'aktiv' ? ` (EMS_MODUS=${modusEms}, nicht gesendet)` : ''), daten: befehl } });\n}\nlet out2 = null;\nif (!gleich || letzter.grund !== grund || jetzt - (letzter.protokoll || 0) >= 30000) {\n    letzter.protokoll = jetzt;\n    const f = { modus: befehl.modus, grund, ueberschuss_W: Math.round(S), frei_W: Math.round(frei), auto_ueberschuss_W: Math.round(autoW),\n        gesendet: senden ? 1 : 0 };\n    for (const k of ['leistung_W', 'max_laden_W', 'max_entladen_W']) if (typeof befehl[k] === 'number') f[k] = befehl[k];\n    out2 = { payload: [{ measurement: 'ems_ausfuehrung', tags: { quelle: 'ems' }, fields: f, timestamp: new Date(jetzt) }] };\n}\nletzter.befehl = befehl; letzter.grund = grund;\ncontext.set('letzter', letzter);\n\nconst grenzen = befehl.modus === 'laden' ? ` ${befehl.leistung_W} W`\n    : befehl.modus === 'begrenzt' ? ` laden ≤ ${befehl.max_laden_W ?? '∞'} W, entladen ≤ ${befehl.max_entladen_W ?? '∞'} W` : '';\nnode.status({ fill: modusEms === 'aktiv' ? 'green' : 'grey', shape: senden ? 'dot' : 'ring',\n    text: `${grund}:${grenzen} · Überschuss ${Math.round(S)} W` + (modusEms !== 'aktiv' ? ` · ${modusEms}` : '') });\nreturn [out1, out2, logs.length ? logs : null];\n",
+  "outputs": 3,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "ems-af-bat"
+   ],
+   [
+    "ems-af-db"
+   ],
+   [
+    "ems-af-log"
+   ]
+  ],
+  "x": 350,
+  "y": 620,
+  "z": "tab-ems",
+  "g": "grp-ausfuehrung"
+ },
+ {
+  "id": "ems-af-bat",
+  "type": "link out",
+  "name": "Befehl Batterie",
+  "mode": "link",
+  "links": [
+   "bat-bef-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 620,
+  "z": "tab-ems",
+  "g": "grp-ausfuehrung"
+ },
+ {
+  "id": "ems-af-db",
+  "type": "link out",
+  "name": "→ Influx ems",
+  "mode": "link",
+  "links": [
+   "sys-db-ems-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 680,
+  "z": "tab-ems",
+  "g": "grp-ausfuehrung"
+ },
+ {
+  "id": "ems-af-log",
+  "type": "link out",
+  "name": "→ Log",
+  "mode": "link",
+  "links": [
+   "log-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 740,
+  "z": "tab-ems",
+  "g": "grp-ausfuehrung"
+ },
+ {
+  "id": "tab-pv",
+  "type": "tab",
+  "label": "☀️ PV & Netz",
+  "disabled": false,
+  "info": "Adapter für PV-Wechselrichter und Netzzähler (oft im Wechselrichter). Solange PV_QUELLE/NETZ_QUELLE = simulator ist, liefert der Simulator die Werte. Siehe docs/geraete-adapter.md."
+ },
+ {
+  "id": "grp-pv-ad",
+  "type": "group",
+  "z": "tab-pv",
+  "name": "Adapter PV-Wechselrichter",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-pv-ad-kom",
+   "pv-lesen-inj",
+   "pv-lesen",
+   "pv-lesen-mw"
+  ],
+  "x": 14,
+  "y": 40,
+  "w": 720,
+  "h": 170
+ },
+ {
+  "id": "grp-pv-ad-kom",
+  "type": "comment",
+  "name": "Vorlage: Gerät abfragen (HTTP/Modbus-Knoten vor „lesen“ einsetzen) → { leistung_W }",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 80,
+  "z": "tab-pv",
+  "g": "grp-pv-ad"
+ },
+ {
+  "id": "pv-lesen-inj",
+  "type": "inject",
+  "name": "alle 10 s",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "10",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "10",
+  "topic": "",
+  "wires": [
+   [
+    "pv-lesen"
+   ]
+  ],
+  "x": 120,
+  "y": 140,
+  "z": "tab-pv",
+  "g": "grp-pv-ad"
+ },
+ {
+  "id": "pv-lesen",
+  "type": "function",
+  "name": "Adapter pv: lesen (Vorlage)",
+  "func": "const GERAET = 'pv';\n// VORLAGE – Adapter: Messwerte lesen (GERAET steht in der ersten Zeile)\n// Hier wird beim Hackathon das echte Gerät angebunden. Siehe docs/geraete-adapter.md.\n//\n// Aufgabe: das Gerät abfragen (vorgeschaltet: HTTP-, Modbus- oder MQTT-Knoten) und die Werte in das\n// einheitliche Format bringen. Ausgang → Link „→ Messwerte“:\n//   msg.geraet = GERAET\n//   msg.quelle = 'geraet'\n//   msg.payload = { … } mit genau diesen Feldern (fehlende weglassen):\n//     pv:       { leistung_W }                                   (≥ 0)\n//     netz:     { bezug_W }                                      (> 0 Bezug, < 0 Einspeisung)\n//     batterie: { soc_pct, leistung_W }                          (leistung_W > 0 Entladen, < 0 Laden)\n//     wallbox:  { leistung_W, status, ampere }                   status: getrennt | angesteckt | laedt | pausiert | stoerung\n//     auto:     { soc_pct }                                      (Ladestand des Autos, falls abrufbar)\n//     wp:       { leistung_W, status, aussen_C?, raum_C? }       status: aus | heizen | warmwasser | stoerung\n//\n// Solange <GERÄT>_QUELLE nicht \"geraet\" ist, tut dieser Knoten nichts.\n\nconst QUELLE_VAR = { pv: 'PV_QUELLE', netz: 'NETZ_QUELLE', batterie: 'BATTERIE_QUELLE', wallbox: 'WALLBOX_QUELLE',\n    auto: 'AUTO_QUELLE', wp: 'WP_QUELLE' }[GERAET];\nif ((env.get(QUELLE_VAR) || 'simulator') !== 'geraet') {\n    node.status({ fill: 'grey', shape: 'ring', text: 'nicht aktiv (' + QUELLE_VAR + ' ≠ geraet)' });\n    return null;\n}\n\n// ▼▼▼ Hier die Antwort des Geräts (msg.payload) umrechnen ▼▼▼\nconst roh = msg.payload;\nconst werte = null; // z. B. { leistung_W: roh.P_PV }\n// ▲▲▲\n\nif (!werte) {\n    if (!context.get('gewarnt')) {\n        context.set('gewarnt', true);\n        node.warn(`${QUELLE_VAR}=geraet, aber der Adapter für ${GERAET} ist noch nicht umgesetzt`);\n    }\n    node.status({ fill: 'yellow', shape: 'ring', text: 'Adapter noch nicht umgesetzt' });\n    return null;\n}\nnode.status({ fill: 'green', shape: 'dot', text: JSON.stringify(werte).slice(0, 60) });\nreturn { geraet: GERAET, quelle: 'geraet', payload: werte };\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "pv-lesen-mw"
+   ]
+  ],
+  "x": 350,
+  "y": 140,
+  "z": "tab-pv",
+  "g": "grp-pv-ad"
+ },
+ {
+  "id": "pv-lesen-mw",
+  "type": "link out",
+  "name": "→ Messwerte",
+  "mode": "link",
+  "links": [
+   "sys-mw-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 140,
+  "z": "tab-pv",
+  "g": "grp-pv-ad"
+ },
+ {
+  "id": "grp-netz-ad",
+  "type": "group",
+  "z": "tab-pv",
+  "name": "Adapter Netzzähler",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-netz-ad-kom",
+   "netz-lesen-inj",
+   "netz-lesen",
+   "netz-lesen-mw"
+  ],
+  "x": 14,
+  "y": 250,
+  "w": 720,
+  "h": 170
+ },
+ {
+  "id": "grp-netz-ad-kom",
+  "type": "comment",
+  "name": "Vorlage: { bezug_W } mit > 0 Bezug, < 0 Einspeisung",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 290,
+  "z": "tab-pv",
+  "g": "grp-netz-ad"
+ },
+ {
+  "id": "netz-lesen-inj",
+  "type": "inject",
+  "name": "alle 10 s",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "10",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "10",
+  "topic": "",
+  "wires": [
+   [
+    "netz-lesen"
+   ]
+  ],
+  "x": 120,
+  "y": 350,
+  "z": "tab-pv",
+  "g": "grp-netz-ad"
+ },
+ {
+  "id": "netz-lesen",
+  "type": "function",
+  "name": "Adapter netz: lesen (Vorlage)",
+  "func": "const GERAET = 'netz';\n// VORLAGE – Adapter: Messwerte lesen (GERAET steht in der ersten Zeile)\n// Hier wird beim Hackathon das echte Gerät angebunden. Siehe docs/geraete-adapter.md.\n//\n// Aufgabe: das Gerät abfragen (vorgeschaltet: HTTP-, Modbus- oder MQTT-Knoten) und die Werte in das\n// einheitliche Format bringen. Ausgang → Link „→ Messwerte“:\n//   msg.geraet = GERAET\n//   msg.quelle = 'geraet'\n//   msg.payload = { … } mit genau diesen Feldern (fehlende weglassen):\n//     pv:       { leistung_W }                                   (≥ 0)\n//     netz:     { bezug_W }                                      (> 0 Bezug, < 0 Einspeisung)\n//     batterie: { soc_pct, leistung_W }                          (leistung_W > 0 Entladen, < 0 Laden)\n//     wallbox:  { leistung_W, status, ampere }                   status: getrennt | angesteckt | laedt | pausiert | stoerung\n//     auto:     { soc_pct }                                      (Ladestand des Autos, falls abrufbar)\n//     wp:       { leistung_W, status, aussen_C?, raum_C? }       status: aus | heizen | warmwasser | stoerung\n//\n// Solange <GERÄT>_QUELLE nicht \"geraet\" ist, tut dieser Knoten nichts.\n\nconst QUELLE_VAR = { pv: 'PV_QUELLE', netz: 'NETZ_QUELLE', batterie: 'BATTERIE_QUELLE', wallbox: 'WALLBOX_QUELLE',\n    auto: 'AUTO_QUELLE', wp: 'WP_QUELLE' }[GERAET];\nif ((env.get(QUELLE_VAR) || 'simulator') !== 'geraet') {\n    node.status({ fill: 'grey', shape: 'ring', text: 'nicht aktiv (' + QUELLE_VAR + ' ≠ geraet)' });\n    return null;\n}\n\n// ▼▼▼ Hier die Antwort des Geräts (msg.payload) umrechnen ▼▼▼\nconst roh = msg.payload;\nconst werte = null; // z. B. { leistung_W: roh.P_PV }\n// ▲▲▲\n\nif (!werte) {\n    if (!context.get('gewarnt')) {\n        context.set('gewarnt', true);\n        node.warn(`${QUELLE_VAR}=geraet, aber der Adapter für ${GERAET} ist noch nicht umgesetzt`);\n    }\n    node.status({ fill: 'yellow', shape: 'ring', text: 'Adapter noch nicht umgesetzt' });\n    return null;\n}\nnode.status({ fill: 'green', shape: 'dot', text: JSON.stringify(werte).slice(0, 60) });\nreturn { geraet: GERAET, quelle: 'geraet', payload: werte };\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "netz-lesen-mw"
+   ]
+  ],
+  "x": 350,
+  "y": 350,
+  "z": "tab-pv",
+  "g": "grp-netz-ad"
+ },
+ {
+  "id": "netz-lesen-mw",
+  "type": "link out",
+  "name": "→ Messwerte",
+  "mode": "link",
+  "links": [
+   "sys-mw-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 350,
+  "z": "tab-pv",
+  "g": "grp-netz-ad"
+ },
+ {
+  "id": "tab-batterie",
+  "type": "tab",
+  "label": "🔋 PV-Batterie",
+  "disabled": false,
+  "info": "Befehle vom EMS (einziger Schreiber) an die Batterie und Adapter zum Lesen von SoC und Leistung."
+ },
+ {
+  "id": "grp-bat-bef",
+  "type": "group",
+  "z": "tab-batterie",
+  "name": "Befehl Batterie",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-bat-bef-kom",
+   "bat-bef-in",
+   "bat-bef",
+   "bat-bef-ad"
+  ],
+  "x": 14,
+  "y": 40,
+  "w": 720,
+  "h": 170
+ },
+ {
+  "id": "grp-bat-bef-kom",
+  "type": "comment",
+  "name": "Vom EMS: eigenverbrauch | laden (leistung_W) | begrenzt (max_laden_W, max_entladen_W)",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 80,
+  "z": "tab-batterie",
+  "g": "grp-bat-bef"
+ },
+ {
+  "id": "bat-bef-in",
+  "type": "link in",
+  "name": "Befehl Batterie",
+  "links": [
+   "ems-af-bat"
+  ],
+  "wires": [
+   [
+    "bat-bef"
+   ]
+  ],
+  "x": 120,
+  "y": 140,
+  "z": "tab-batterie",
+  "g": "grp-bat-bef"
+ },
+ {
+  "id": "bat-bef",
+  "type": "function",
+  "name": "Befehl verteilen",
+  "func": "const GERAET = 'batterie';\n// Befehl verteilen (je Gerät, GERAET steht in der ersten Zeile, vom Generator eingesetzt)\n// ─ Eingang: msg.befehl vom EMS (Batterie), von der Ladeplanung (Wallbox) oder der Wärmepumpen-Steuerung\n// ─ Ausgang 1: an den Geräte-Adapter (nur wenn <GERÄT>_QUELLE = geraet)\n// ─ Kontext: global.befehl_<geraet> = letzter Befehl (der Simulator liest ihn von dort)\n//            global.abbild['befehl.<geraet>'] (zur Anzeige)\n// ─ Umgebung: <GERÄT>_QUELLE: simulator (Standard) | geraet | aus\n\nconst QUELLE_VAR = { batterie: 'BATTERIE_QUELLE', wallbox: 'WALLBOX_QUELLE', wp: 'WP_QUELLE' }[GERAET];\nconst quelle = env.get(QUELLE_VAR) || 'simulator';\nconst b = msg.befehl;\nif (!b) return null;\nglobal.set('befehl_' + GERAET, b);\nconst abbild = global.get('abbild') || {};\nabbild['befehl.' + GERAET] = { wert: b, einheit: '', zeit: Date.now(), quelle: 'ems' };\nglobal.set('abbild', abbild);\n\nconst kurz = Object.entries(b).filter(([k]) => !['grund', 'zeit'].includes(k)).map(([k, v]) => `${k}=${v}`).join(' ');\nnode.status({ fill: quelle === 'aus' ? 'grey' : 'green', shape: 'dot', text: `${quelle}: ${kurz}` });\nreturn quelle === 'geraet' ? msg : null;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "bat-bef-ad"
+   ]
+  ],
+  "x": 350,
+  "y": 140,
+  "z": "tab-batterie",
+  "g": "grp-bat-bef"
+ },
+ {
+  "id": "bat-bef-ad",
+  "type": "function",
+  "name": "Adapter batterie: senden (Vorlage)",
+  "func": "const GERAET = 'batterie';\n// VORLAGE – Adapter: Befehl ans Gerät senden (GERAET steht in der ersten Zeile)\n// Hier wird beim Hackathon das echte Gerät angebunden. Siehe docs/geraete-adapter.md.\n//\n// Eingang msg.befehl (nur, wenn <GERÄT>_QUELLE = geraet):\n//   batterie: { modus: 'eigenverbrauch' }\n//             { modus: 'laden', leistung_W }                        aus dem Netz laden\n//             { modus: 'begrenzt', max_laden_W, max_entladen_W }    null = keine Grenze, 0 = gesperrt\n//   wallbox:  { modus: 'frei' } | { modus: 'pause' } | { modus: 'strom', ampere }\n//   wp:       { sgready: 2|3, anhebung_K, ww_absenken }\n// Ausgang → HTTP-/Modbus-/MQTT-Knoten des Geräts.\n// Sicherheit: Gerät so einstellen, dass es ohne neuen Befehl nach einigen Minuten in den Normalbetrieb fällt\n// (Timeout), sonst bleibt bei einem Ausfall von Node-RED der letzte Befehl stehen.\n\nconst b = msg.befehl;\n\n// ▼▼▼ Hier den Befehl in Register/Anfrage des Geräts übersetzen ▼▼▼\nconst anfrage = null; // z. B. { payload: { value: b.max_laden_W, fc: 6, unitid: 1, address: 1234, quantity: 1 } }\n// ▲▲▲\n\nif (!anfrage) {\n    if (!context.get('gewarnt')) {\n        context.set('gewarnt', true);\n        node.warn(`Befehl für ${GERAET} kann nicht gesendet werden: Adapter noch nicht umgesetzt`);\n    }\n    node.status({ fill: 'yellow', shape: 'ring', text: 'Adapter noch nicht umgesetzt' });\n    return null;\n}\nnode.status({ fill: 'green', shape: 'dot', text: JSON.stringify(b).slice(0, 60) });\nreturn anfrage;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   []
+  ],
+  "x": 580,
+  "y": 140,
+  "z": "tab-batterie",
+  "g": "grp-bat-bef"
+ },
+ {
+  "id": "grp-bat-ad",
+  "type": "group",
+  "z": "tab-batterie",
+  "name": "Adapter Batterie",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-bat-ad-kom",
+   "bat-lesen-inj",
+   "bat-lesen",
+   "bat-lesen-mw"
+  ],
+  "x": 14,
+  "y": 250,
+  "w": 720,
+  "h": 170
+ },
+ {
+  "id": "grp-bat-ad-kom",
+  "type": "comment",
+  "name": "Vorlage: { soc_pct, leistung_W } mit leistung_W > 0 Entladen, < 0 Laden",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 290,
+  "z": "tab-batterie",
+  "g": "grp-bat-ad"
+ },
+ {
+  "id": "bat-lesen-inj",
+  "type": "inject",
+  "name": "alle 10 s",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "10",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "10",
+  "topic": "",
+  "wires": [
+   [
+    "bat-lesen"
+   ]
+  ],
+  "x": 120,
+  "y": 350,
+  "z": "tab-batterie",
+  "g": "grp-bat-ad"
+ },
+ {
+  "id": "bat-lesen",
+  "type": "function",
+  "name": "Adapter batterie: lesen (Vorlage)",
+  "func": "const GERAET = 'batterie';\n// VORLAGE – Adapter: Messwerte lesen (GERAET steht in der ersten Zeile)\n// Hier wird beim Hackathon das echte Gerät angebunden. Siehe docs/geraete-adapter.md.\n//\n// Aufgabe: das Gerät abfragen (vorgeschaltet: HTTP-, Modbus- oder MQTT-Knoten) und die Werte in das\n// einheitliche Format bringen. Ausgang → Link „→ Messwerte“:\n//   msg.geraet = GERAET\n//   msg.quelle = 'geraet'\n//   msg.payload = { … } mit genau diesen Feldern (fehlende weglassen):\n//     pv:       { leistung_W }                                   (≥ 0)\n//     netz:     { bezug_W }                                      (> 0 Bezug, < 0 Einspeisung)\n//     batterie: { soc_pct, leistung_W }                          (leistung_W > 0 Entladen, < 0 Laden)\n//     wallbox:  { leistung_W, status, ampere }                   status: getrennt | angesteckt | laedt | pausiert | stoerung\n//     auto:     { soc_pct }                                      (Ladestand des Autos, falls abrufbar)\n//     wp:       { leistung_W, status, aussen_C?, raum_C? }       status: aus | heizen | warmwasser | stoerung\n//\n// Solange <GERÄT>_QUELLE nicht \"geraet\" ist, tut dieser Knoten nichts.\n\nconst QUELLE_VAR = { pv: 'PV_QUELLE', netz: 'NETZ_QUELLE', batterie: 'BATTERIE_QUELLE', wallbox: 'WALLBOX_QUELLE',\n    auto: 'AUTO_QUELLE', wp: 'WP_QUELLE' }[GERAET];\nif ((env.get(QUELLE_VAR) || 'simulator') !== 'geraet') {\n    node.status({ fill: 'grey', shape: 'ring', text: 'nicht aktiv (' + QUELLE_VAR + ' ≠ geraet)' });\n    return null;\n}\n\n// ▼▼▼ Hier die Antwort des Geräts (msg.payload) umrechnen ▼▼▼\nconst roh = msg.payload;\nconst werte = null; // z. B. { leistung_W: roh.P_PV }\n// ▲▲▲\n\nif (!werte) {\n    if (!context.get('gewarnt')) {\n        context.set('gewarnt', true);\n        node.warn(`${QUELLE_VAR}=geraet, aber der Adapter für ${GERAET} ist noch nicht umgesetzt`);\n    }\n    node.status({ fill: 'yellow', shape: 'ring', text: 'Adapter noch nicht umgesetzt' });\n    return null;\n}\nnode.status({ fill: 'green', shape: 'dot', text: JSON.stringify(werte).slice(0, 60) });\nreturn { geraet: GERAET, quelle: 'geraet', payload: werte };\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "bat-lesen-mw"
+   ]
+  ],
+  "x": 350,
+  "y": 350,
+  "z": "tab-batterie",
+  "g": "grp-bat-ad"
+ },
+ {
+  "id": "bat-lesen-mw",
+  "type": "link out",
+  "name": "→ Messwerte",
+  "mode": "link",
+  "links": [
+   "sys-mw-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 350,
+  "z": "tab-batterie",
+  "g": "grp-bat-ad"
+ },
+ {
+  "id": "tab-auto",
+  "type": "tab",
+  "label": "🚗 Auto",
+  "disabled": false,
+  "info": "Ladeplanung (bis 25 % sofort, 50 % sicher zur Abfahrt, bis 80 % in günstigen Stunden, PV-Laden), Befehl an die Wallbox und Adapter. Siehe docs/wallbox.md."
+ },
+ {
+  "id": "grp-wb-plan",
+  "type": "group",
+  "z": "tab-auto",
+  "name": "Ladeplanung",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-wb-plan-kom",
+   "wb-plan-inj",
+   "wb-plan",
+   "wb-plan-db",
+   "wb-plan-log",
+   "wb-bef",
+   "wb-bef-ad"
+  ],
+  "x": 14,
+  "y": 40,
+  "w": 950,
+  "h": 290
+ },
+ {
+  "id": "grp-wb-plan-kom",
+  "type": "comment",
+  "name": "Jede Minute: frei, Pause oder PV-Laden (Ampere) → InfluxDB „wallbox_plan“, Meldungen bei Start/Ende",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 80,
+  "z": "tab-auto",
+  "g": "grp-wb-plan"
+ },
+ {
+  "id": "wb-plan-inj",
+  "type": "inject",
+  "name": "jede Minute",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "60",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "40",
+  "topic": "",
+  "wires": [
+   [
+    "wb-plan"
+   ]
+  ],
+  "x": 120,
+  "y": 140,
+  "z": "tab-auto",
+  "g": "grp-wb-plan"
+ },
+ {
+  "id": "wb-plan",
+  "type": "function",
+  "name": "Ladeplanung",
+  "func": "// 🚗 Ladeplanung (jede Minute): Wallbox frei, Pause oder PV-Laden mit Strom in Ampere\n// Übernommen aus Haus-EMS (docs/wallbox.md): bis 25 % sofort, 50 % sicher zur Abfahrt, bis 80 % nur in\n// günstigen Stunden, darüber frei (Ladeziel im Auto); dazu PV-Laden mit dem Überschuss nach dem Hausakku.\n// ─ Eingang: Inject jede Minute\n// ─ Ausgang 1: Befehl an die Wallbox (msg.befehl = { modus: 'frei' | 'pause' | 'strom', ampere? }) → Link „Befehl Wallbox“\n// ─ Ausgang 2: InfluxDB-Punkt (Bucket ems, Messreihe \"wallbox_plan\")\n// ─ Ausgang 3: msg.log (Regelwechsel, Laden gestartet/pausiert/beendet, Zusage in Gefahr)\n// ─ Liest: global.abbild (auto.soc_pct, wallbox.status, wallbox.leistung_W), global.ems_plan, global.ems_ueberschuss\n// ─ Schreibt: global.wallbox_plan = { regel, befehl, zeit } (für die EMS-Ausführung)\n// ─ Umgebung: WB_MODUS, WB_STRATEGIE, WB_ABFAHRT, WB_ABFAHRT_TAGE, WB_SOFORT_SOC, WB_PFLICHT_SOC, WB_ZIEL_SOC,\n//             WB_AKKU_KWH, WB_WIRKUNGSGRAD, WB_PHASEN, WB_MAX_A, WB_MIN_A, WB_SOC_MAX_ALTER_MIN, WB_TEUER_ANTEIL,\n//             WB_PV_MODUS, WB_PV_MIN_KW, WB_PV_HALT_KW, WB_MELDUNGEN\n\nconst jetzt = Date.now();\nconst abbild = global.get('abbild') || {};\nfunction wert(s, maxS) { const e = abbild[s]; return e && jetzt - e.zeit <= maxS * 1000 ? e.wert : null; }\nfunction zahl(n, std) { const v = parseFloat(env.get(n)); return isNaN(v) ? std : v; }\nfunction text(n, std) { const v = env.get(n); return v === undefined || v === null || v === '' ? std : String(v); }\nconst fmt = (x, n = 1) => x.toFixed(n).replace('.', ',');\nconst stunde = t => parseInt(new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: 'numeric', hourCycle: 'h23' }).format(t), 10);\nconst wochentag = t => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(\n    new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', weekday: 'short' }).format(t)) + 1; // 1 = Montag\n\nconst modus = text('WB_MODUS', 'beobachten');\nconst strategie = text('WB_STRATEGIE', 'plan');\nconst SOFORT = zahl('WB_SOFORT_SOC', 25), PFLICHT = zahl('WB_PFLICHT_SOC', 50), ZIEL = zahl('WB_ZIEL_SOC', 80);\nconst akkuKWh = zahl('WB_AKKU_KWH', 60), eta = zahl('WB_WIRKUNGSGRAD', 0.9);\nconst phasen = zahl('WB_PHASEN', 3), maxA = zahl('WB_MAX_A', 16), minA = zahl('WB_MIN_A', 6);\nconst wJeA = phasen * 230;\nconst ladeKW = maxA * wJeA / 1000;\nconst teuerAnteil = zahl('WB_TEUER_ANTEIL', 0.5);\nconst abfahrtH = parseInt(text('WB_ABFAHRT', '06:00').split(':')[0], 10);\nconst abfahrtTage = text('WB_ABFAHRT_TAGE', '1,2,3,4,5').split(',').map(s => parseInt(s, 10));\n\nconst soc = wert('auto.soc_pct', zahl('WB_SOC_MAX_ALTER_MIN', 90) * 60);\nconst status = wert('wallbox.status', 300);\nconst leistung = wert('wallbox.leistung_W', 300);\nconst angesteckt = ['angesteckt', 'laedt', 'pausiert'].includes(status);\n\n// Preise ab der laufenden Stunde (Plan des EMS, höchstens 20 min alt)\nconst h0 = Math.floor(jetzt / 3600000) * 3600000;\nconst plan = global.get('ems_plan');\nconst preise = plan && jetzt - plan.zeit < 20 * 60000 ? (plan.preise || []).filter(p => p.t >= h0) : [];\n\n// nächste Abfahrt: erste volle Stunde WB_ABFAHRT an einem Abfahrtstag\nlet abfahrt = null;\nfor (let i = 1; i <= 8 * 24; i++) {\n    const t = h0 + i * 3600000;\n    if (stunde(t) === abfahrtH && abfahrtTage.includes(wochentag(t))) { abfahrt = t; break; }\n}\nconst stundenFuer = pp => Math.ceil(Math.max(0, pp) / 100 * akkuKWh / eta / ladeKW);\nconst uhr = t => stunde(t) + ' Uhr';\n\n// Stunden bis zur Abfahrt mit Preis (unbekannte Stunden mit dem Mittel der bekannten)\nconst mittelPreis = preise.length ? preise.reduce((a, p) => a + p.ct, 0) / preise.length : null;\nconst bisAbfahrt = [];\nif (abfahrt) for (let t = h0; t < abfahrt; t += 3600000) {\n    const p = preise.find(x => x.t === t);\n    bisAbfahrt.push({ t, ct: p ? p.ct : mittelPreis, bekannt: !!p });\n}\nconst teuerste = (liste, anteil) => {\n    const n = Math.floor(liste.length * anteil);\n    return new Set(liste.slice().sort((a, b) => b.ct - a.ct).slice(0, n).map(x => x.t));\n};\nconst billigsteN = (liste, n) => new Set(liste.slice().sort((a, b) => a.ct - b.ct || a.t - b.t).slice(0, n).map(x => x.t));\n\nlet regel, frei, grund, bedarfKWh = 0, noetig = 0;\nif (!preise.length) {\n    regel = 'ohne_preise'; frei = true; grund = 'keine Preise: frei (lieber laden als stehen bleiben)';\n} else if (soc === null || strategie === 'sperre') {\n    // Regel „teuerste Stunden“: Ladestand unbekannt oder so eingestellt\n    const teuer = teuerste(preise, teuerAnteil).has(h0);\n    regel = 'sperre'; frei = !teuer;\n    grund = (soc === null ? 'Ladestand unbekannt, ' : '') + (teuer ? 'teure Stunde: Pause' : 'keine teure Stunde: frei');\n} else if (soc < SOFORT) {\n    regel = 'sofort'; frei = true; grund = `bis ${SOFORT} %: sofort`;\n} else if (soc >= ZIEL) {\n    regel = 'frei'; frei = true; grund = `ab ${ZIEL} %: Ladeziel im Auto entscheidet`;\n} else {\n    bedarfKWh = (ZIEL - soc) / 100 * akkuKWh / eta;\n    const nZiel = stundenFuer(ZIEL - soc);\n    const guenstig = bisAbfahrt.filter(x => !teuerste(bisAbfahrt, teuerAnteil).has(x.t));\n    const zielStunden = billigsteN(guenstig, nZiel);\n    if (soc < PFLICHT) {\n        noetig = stundenFuer(PFLICHT - soc);\n        if (bisAbfahrt.length <= noetig) { regel = 'pflicht'; frei = true; grund = `bis ${PFLICHT} %: Zeit reicht knapp, sofort`; }\n        else if (billigsteN(bisAbfahrt, noetig).has(h0)) { regel = 'pflicht'; frei = true; grund = `bis ${PFLICHT} % zur Abfahrt: günstige Stunde (${noetig} h nötig)`; }\n        else if (zielStunden.has(h0)) { regel = 'ziel'; frei = true; grund = `bis ${ZIEL} %: günstige Stunde (${nZiel} h)`; }\n        else { regel = 'pflicht'; frei = false; grund = `warten auf günstige Stunde (${noetig} h bis ${PFLICHT} %, Abfahrt ${uhr(abfahrt)})`; }\n    } else {\n        noetig = nZiel;\n        if (zielStunden.has(h0)) { regel = 'ziel'; frei = true; grund = `bis ${ZIEL} %: günstige Stunde (${nZiel} h)`; }\n        else { regel = 'ziel'; frei = false; grund = `warten auf günstige Stunde (${nZiel} h bis ${ZIEL} %)`; }\n    }\n}\n\n// PV-Laden: würde das Auto gerade nicht laden, steckt aber und ist unter dem Ziel → mit dem Überschuss laden\nconst pvModus = text('WB_PV_MODUS', 'aktiv');\nconst ue = global.get('ems_ueberschuss');\nconst ueW = ue && jetzt - ue.zeit < 120000 ? ue.car_W : 0;\nconst pv = context.get('pv') || { aktiv: false, ueber: 0, unter: 0, ampere: 0, geaendert: 0 };\nconst pvMoeglich = !frei && angesteckt && (soc === null || soc < ZIEL) && pvModus !== 'aus';\nif (pvMoeglich) {\n    pv.ueber = ueW >= zahl('WB_PV_MIN_KW', 4.2) * 1000 ? pv.ueber + 1 : 0;\n    pv.unter = ueW < zahl('WB_PV_HALT_KW', 3.6) * 1000 ? pv.unter + 1 : 0;\n    if (!pv.aktiv && pv.ueber >= 2) { pv.aktiv = true; pv.geaendert = 0; }\n    if (pv.aktiv && pv.unter >= 2) pv.aktiv = false;\n} else { pv.aktiv = false; pv.ueber = 0; pv.unter = 0; }\nlet befehl;\nif (pv.aktiv) {\n    // Ampere dem Überschuss nachführen, höchstens alle 2 min (schont Wallbox und Auto).\n    // ems_ueberschuss enthält beim PV-Laden die Ladeleistung des Autos schon (EMS-Ausführung).\n    const ziel = Math.min(maxA, Math.max(minA, Math.floor(ueW / wJeA)));\n    if (!pv.ampere || jetzt - pv.geaendert >= 120000) { if (ziel !== pv.ampere) pv.geaendert = jetzt; pv.ampere = ziel; }\n    befehl = { modus: 'strom', ampere: pv.ampere };\n    regel = 'pv'; grund = `PV-Überschuss ${fmt(ueW / 1000)} kW (${pv.ampere} A)`;\n} else {\n    pv.ampere = 0;\n    befehl = frei ? { modus: 'frei' } : { modus: 'pause' };\n}\ncontext.set('pv', pv);\nconst effektivModus = pvModus === 'aktiv' ? befehl : (frei ? { modus: 'frei' } : { modus: 'pause' });\nglobal.set('wallbox_plan', { regel: effektivModus.modus === 'strom' ? 'pv' : regel, befehl: effektivModus, grund, zeit: jetzt });\n\n// Senden: bei Änderung und alle 15 min, nur im Modus aktiv\nconst st = context.get('st') || {};\nconst geaendert = JSON.stringify(st.befehl) !== JSON.stringify(effektivModus);\nconst senden = modus === 'aktiv' && (geaendert || jetzt - (st.gesendet || 0) >= 15 * 60000);\nif (senden) st.gesendet = jetzt;\n\n// Meldungen: Laden gestartet (3 min > 1 kW), pausiert (Sperre greift, Auto steckt), beendet (3 min nichts, mit kWh)\nconst logs = [];\nconst melden = text('WB_MELDUNGEN', 'an') === 'an' && modus === 'aktiv' ? 'wallbox' : undefined;\nconst lv = st.lv || { laedt: false, ueber: 0, unter: 0, energie_Wh: 0, start: 0 };\nconst fliesst = (leistung || 0) > 1000;\nif (lv.laedt || fliesst) lv.energie_Wh += Math.max(0, leistung || 0) / 60;\nlv.ueber = fliesst ? lv.ueber + 1 : 0;\nlv.unter = fliesst ? 0 : lv.unter + 1;\nconst socText = (soc !== null ? ` · Auto ${Math.round(soc)} %` : '') + (modus !== 'aktiv' ? ` (WB_MODUS=${modus}, Plan nicht gesendet)` : '');\nif (!lv.laedt && lv.ueber >= 3) {\n    lv.laedt = true; lv.start = lv.start || jetzt - 3 * 60000;\n    logs.push({ log: { stufe: 'info', bereich: 'wallbox', melden, text: `🔌 Wallbox: Laden gestartet – Regel: ${grund}${socText}` } });\n} else if (lv.laedt && lv.unter >= 3) {\n    lv.laedt = false;\n    if (!(befehl.modus === 'pause' && angesteckt)) {\n        const dauer = Math.round((jetzt - lv.start) / 60000);\n        logs.push({ log: { stufe: 'info', bereich: 'wallbox', melden,\n            text: `✅ Wallbox: Laden beendet – ${angesteckt ? 'vom Auto' : 'abgesteckt'}${socText} · geladen ${fmt(lv.energie_Wh / 1000)} kWh in ${Math.floor(dauer / 60)} h ${dauer % 60} min` } });\n        lv.energie_Wh = 0; lv.start = 0;\n    }\n}\nif (!angesteckt && !lv.laedt) { lv.energie_Wh = 0; lv.start = 0; }\nif (geaendert && st.befehl && effektivModus.modus === 'pause' && angesteckt) {\n    logs.push({ log: { stufe: 'info', bereich: 'wallbox', melden, text: `⏸ Wallbox: Laden pausiert – Regel: ${grund}${socText}` } });\n}\nst.lv = lv;\n\n// Zusage in Gefahr: Auto steckt, unter der Pflicht, Wallbox frei, aber 10 min fließt nachweislich kein Strom\nconst gefahr = modus === 'aktiv' && angesteckt && soc !== null && soc < PFLICHT && befehl.modus !== 'pause' && leistung !== null && leistung <= 1000;\nst.gefahrMin = gefahr ? (st.gefahrMin || 0) + 1 : 0;\nif (st.gefahrMin === 10) {\n    logs.push({ log: { stufe: 'warnung', bereich: 'wallbox', melden: 'zusage',\n        text: `Zusage in Gefahr: Auto bei ${Math.round(soc)} % (Pflicht ${PFLICHT} %), Wallbox frei, aber seit 10 min kein Strom` } });\n    st.gefahr = true;\n} else if (st.gefahr && !gefahr) {\n    logs.push({ log: { stufe: 'info', bereich: 'wallbox', melden: 'zusage', text: 'Entwarnung: Auto lädt wieder oder Pflicht erreicht' } });\n    st.gefahr = false;\n}\nif (st.regel !== regel && st.regel !== undefined && !logs.length) {\n    logs.push({ log: { stufe: 'info', bereich: 'wallbox', text: `Ladeplanung: ${grund}` } });\n}\nst.befehl = effektivModus; st.regel = regel;\ncontext.set('st', st);\n\nconst fields = { regel, befehl: effektivModus.modus, frei: frei ? 1 : 0, grund, ampere: effektivModus.ampere || 0,\n    pv_moeglich: pvMoeglich ? 1 : 0, pv_ueberschuss_W: Math.round(ueW), angesteckt: angesteckt ? 1 : 0,\n    bedarf_kWh: +bedarfKWh.toFixed(1), stunden_noetig: noetig, bekannte_stunden: preise.length, gesendet: senden ? 1 : 0 };\nif (soc !== null) fields.soc = soc;\nif (leistung !== null) fields.leistung_W = leistung;\nif (abfahrt) fields.bis_abfahrt_h = +((abfahrt - jetzt) / 3600000).toFixed(1);\nif (preise.length) fields.preis_ct = preise[0].ct;\n\nnode.status({ fill: effektivModus.modus === 'pause' ? 'yellow' : 'green', shape: senden ? 'dot' : 'ring',\n    text: `${effektivModus.modus}${effektivModus.ampere ? ' ' + effektivModus.ampere + ' A' : ''} – ${grund}` + (modus !== 'aktiv' ? ` · ${modus}` : '') });\nreturn [senden ? { befehl: Object.assign({ grund, zeit: jetzt }, effektivModus) } : null,\n        { payload: [{ measurement: 'wallbox_plan', tags: { quelle: 'ems' }, fields, timestamp: new Date(jetzt) }] },\n        logs.length ? logs : null];\n",
+  "outputs": 3,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "wb-bef"
+   ],
+   [
+    "wb-plan-db"
+   ],
+   [
+    "wb-plan-log"
+   ]
+  ],
+  "x": 350,
+  "y": 140,
+  "z": "tab-auto",
+  "g": "grp-wb-plan"
+ },
+ {
+  "id": "wb-plan-db",
+  "type": "link out",
+  "name": "→ Influx ems",
+  "mode": "link",
+  "links": [
+   "sys-db-ems-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 200,
+  "z": "tab-auto",
+  "g": "grp-wb-plan"
+ },
+ {
+  "id": "wb-plan-log",
+  "type": "link out",
+  "name": "→ Log",
+  "mode": "link",
+  "links": [
+   "log-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 260,
+  "z": "tab-auto",
+  "g": "grp-wb-plan"
+ },
+ {
+  "id": "wb-bef",
+  "type": "function",
+  "name": "Befehl verteilen",
+  "func": "const GERAET = 'wallbox';\n// Befehl verteilen (je Gerät, GERAET steht in der ersten Zeile, vom Generator eingesetzt)\n// ─ Eingang: msg.befehl vom EMS (Batterie), von der Ladeplanung (Wallbox) oder der Wärmepumpen-Steuerung\n// ─ Ausgang 1: an den Geräte-Adapter (nur wenn <GERÄT>_QUELLE = geraet)\n// ─ Kontext: global.befehl_<geraet> = letzter Befehl (der Simulator liest ihn von dort)\n//            global.abbild['befehl.<geraet>'] (zur Anzeige)\n// ─ Umgebung: <GERÄT>_QUELLE: simulator (Standard) | geraet | aus\n\nconst QUELLE_VAR = { batterie: 'BATTERIE_QUELLE', wallbox: 'WALLBOX_QUELLE', wp: 'WP_QUELLE' }[GERAET];\nconst quelle = env.get(QUELLE_VAR) || 'simulator';\nconst b = msg.befehl;\nif (!b) return null;\nglobal.set('befehl_' + GERAET, b);\nconst abbild = global.get('abbild') || {};\nabbild['befehl.' + GERAET] = { wert: b, einheit: '', zeit: Date.now(), quelle: 'ems' };\nglobal.set('abbild', abbild);\n\nconst kurz = Object.entries(b).filter(([k]) => !['grund', 'zeit'].includes(k)).map(([k, v]) => `${k}=${v}`).join(' ');\nnode.status({ fill: quelle === 'aus' ? 'grey' : 'green', shape: 'dot', text: `${quelle}: ${kurz}` });\nreturn quelle === 'geraet' ? msg : null;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "wb-bef-ad"
+   ]
+  ],
+  "x": 580,
+  "y": 140,
+  "z": "tab-auto",
+  "g": "grp-wb-plan"
+ },
+ {
+  "id": "wb-bef-ad",
+  "type": "function",
+  "name": "Adapter wallbox: senden (Vorlage)",
+  "func": "const GERAET = 'wallbox';\n// VORLAGE – Adapter: Befehl ans Gerät senden (GERAET steht in der ersten Zeile)\n// Hier wird beim Hackathon das echte Gerät angebunden. Siehe docs/geraete-adapter.md.\n//\n// Eingang msg.befehl (nur, wenn <GERÄT>_QUELLE = geraet):\n//   batterie: { modus: 'eigenverbrauch' }\n//             { modus: 'laden', leistung_W }                        aus dem Netz laden\n//             { modus: 'begrenzt', max_laden_W, max_entladen_W }    null = keine Grenze, 0 = gesperrt\n//   wallbox:  { modus: 'frei' } | { modus: 'pause' } | { modus: 'strom', ampere }\n//   wp:       { sgready: 2|3, anhebung_K, ww_absenken }\n// Ausgang → HTTP-/Modbus-/MQTT-Knoten des Geräts.\n// Sicherheit: Gerät so einstellen, dass es ohne neuen Befehl nach einigen Minuten in den Normalbetrieb fällt\n// (Timeout), sonst bleibt bei einem Ausfall von Node-RED der letzte Befehl stehen.\n\nconst b = msg.befehl;\n\n// ▼▼▼ Hier den Befehl in Register/Anfrage des Geräts übersetzen ▼▼▼\nconst anfrage = null; // z. B. { payload: { value: b.max_laden_W, fc: 6, unitid: 1, address: 1234, quantity: 1 } }\n// ▲▲▲\n\nif (!anfrage) {\n    if (!context.get('gewarnt')) {\n        context.set('gewarnt', true);\n        node.warn(`Befehl für ${GERAET} kann nicht gesendet werden: Adapter noch nicht umgesetzt`);\n    }\n    node.status({ fill: 'yellow', shape: 'ring', text: 'Adapter noch nicht umgesetzt' });\n    return null;\n}\nnode.status({ fill: 'green', shape: 'dot', text: JSON.stringify(b).slice(0, 60) });\nreturn anfrage;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   []
+  ],
+  "x": 810,
+  "y": 140,
+  "z": "tab-auto",
+  "g": "grp-wb-plan"
+ },
+ {
+  "id": "grp-wb-ad",
+  "type": "group",
+  "z": "tab-auto",
+  "name": "Adapter Wallbox",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-wb-ad-kom",
+   "wb-lesen-inj",
+   "wb-lesen",
+   "wb-lesen-mw"
+  ],
+  "x": 14,
+  "y": 370,
+  "w": 720,
+  "h": 170
+ },
+ {
+  "id": "grp-wb-ad-kom",
+  "type": "comment",
+  "name": "Vorlage: { leistung_W, status, ampere }",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 410,
+  "z": "tab-auto",
+  "g": "grp-wb-ad"
+ },
+ {
+  "id": "wb-lesen-inj",
+  "type": "inject",
+  "name": "alle 10 s",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "10",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "10",
+  "topic": "",
+  "wires": [
+   [
+    "wb-lesen"
+   ]
+  ],
+  "x": 120,
+  "y": 470,
+  "z": "tab-auto",
+  "g": "grp-wb-ad"
+ },
+ {
+  "id": "wb-lesen",
+  "type": "function",
+  "name": "Adapter wallbox: lesen (Vorlage)",
+  "func": "const GERAET = 'wallbox';\n// VORLAGE – Adapter: Messwerte lesen (GERAET steht in der ersten Zeile)\n// Hier wird beim Hackathon das echte Gerät angebunden. Siehe docs/geraete-adapter.md.\n//\n// Aufgabe: das Gerät abfragen (vorgeschaltet: HTTP-, Modbus- oder MQTT-Knoten) und die Werte in das\n// einheitliche Format bringen. Ausgang → Link „→ Messwerte“:\n//   msg.geraet = GERAET\n//   msg.quelle = 'geraet'\n//   msg.payload = { … } mit genau diesen Feldern (fehlende weglassen):\n//     pv:       { leistung_W }                                   (≥ 0)\n//     netz:     { bezug_W }                                      (> 0 Bezug, < 0 Einspeisung)\n//     batterie: { soc_pct, leistung_W }                          (leistung_W > 0 Entladen, < 0 Laden)\n//     wallbox:  { leistung_W, status, ampere }                   status: getrennt | angesteckt | laedt | pausiert | stoerung\n//     auto:     { soc_pct }                                      (Ladestand des Autos, falls abrufbar)\n//     wp:       { leistung_W, status, aussen_C?, raum_C? }       status: aus | heizen | warmwasser | stoerung\n//\n// Solange <GERÄT>_QUELLE nicht \"geraet\" ist, tut dieser Knoten nichts.\n\nconst QUELLE_VAR = { pv: 'PV_QUELLE', netz: 'NETZ_QUELLE', batterie: 'BATTERIE_QUELLE', wallbox: 'WALLBOX_QUELLE',\n    auto: 'AUTO_QUELLE', wp: 'WP_QUELLE' }[GERAET];\nif ((env.get(QUELLE_VAR) || 'simulator') !== 'geraet') {\n    node.status({ fill: 'grey', shape: 'ring', text: 'nicht aktiv (' + QUELLE_VAR + ' ≠ geraet)' });\n    return null;\n}\n\n// ▼▼▼ Hier die Antwort des Geräts (msg.payload) umrechnen ▼▼▼\nconst roh = msg.payload;\nconst werte = null; // z. B. { leistung_W: roh.P_PV }\n// ▲▲▲\n\nif (!werte) {\n    if (!context.get('gewarnt')) {\n        context.set('gewarnt', true);\n        node.warn(`${QUELLE_VAR}=geraet, aber der Adapter für ${GERAET} ist noch nicht umgesetzt`);\n    }\n    node.status({ fill: 'yellow', shape: 'ring', text: 'Adapter noch nicht umgesetzt' });\n    return null;\n}\nnode.status({ fill: 'green', shape: 'dot', text: JSON.stringify(werte).slice(0, 60) });\nreturn { geraet: GERAET, quelle: 'geraet', payload: werte };\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "wb-lesen-mw"
+   ]
+  ],
+  "x": 350,
+  "y": 470,
+  "z": "tab-auto",
+  "g": "grp-wb-ad"
+ },
+ {
+  "id": "wb-lesen-mw",
+  "type": "link out",
+  "name": "→ Messwerte",
+  "mode": "link",
+  "links": [
+   "sys-mw-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 470,
+  "z": "tab-auto",
+  "g": "grp-wb-ad"
+ },
+ {
+  "id": "grp-auto-ad",
+  "type": "group",
+  "z": "tab-auto",
+  "name": "Adapter Auto-Ladestand",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-auto-ad-kom",
+   "auto-lesen-inj",
+   "auto-lesen",
+   "auto-lesen-mw"
+  ],
+  "x": 14,
+  "y": 580,
+  "w": 720,
+  "h": 170
+ },
+ {
+  "id": "grp-auto-ad-kom",
+  "type": "comment",
+  "name": "Vorlage: { soc_pct } aus der Hersteller-Schnittstelle des Autos (alle 5 min)",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 620,
+  "z": "tab-auto",
+  "g": "grp-auto-ad"
+ },
+ {
+  "id": "auto-lesen-inj",
+  "type": "inject",
+  "name": "alle 300 s",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "300",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "10",
+  "topic": "",
+  "wires": [
+   [
+    "auto-lesen"
+   ]
+  ],
+  "x": 120,
+  "y": 680,
+  "z": "tab-auto",
+  "g": "grp-auto-ad"
+ },
+ {
+  "id": "auto-lesen",
+  "type": "function",
+  "name": "Adapter auto: lesen (Vorlage)",
+  "func": "const GERAET = 'auto';\n// VORLAGE – Adapter: Messwerte lesen (GERAET steht in der ersten Zeile)\n// Hier wird beim Hackathon das echte Gerät angebunden. Siehe docs/geraete-adapter.md.\n//\n// Aufgabe: das Gerät abfragen (vorgeschaltet: HTTP-, Modbus- oder MQTT-Knoten) und die Werte in das\n// einheitliche Format bringen. Ausgang → Link „→ Messwerte“:\n//   msg.geraet = GERAET\n//   msg.quelle = 'geraet'\n//   msg.payload = { … } mit genau diesen Feldern (fehlende weglassen):\n//     pv:       { leistung_W }                                   (≥ 0)\n//     netz:     { bezug_W }                                      (> 0 Bezug, < 0 Einspeisung)\n//     batterie: { soc_pct, leistung_W }                          (leistung_W > 0 Entladen, < 0 Laden)\n//     wallbox:  { leistung_W, status, ampere }                   status: getrennt | angesteckt | laedt | pausiert | stoerung\n//     auto:     { soc_pct }                                      (Ladestand des Autos, falls abrufbar)\n//     wp:       { leistung_W, status, aussen_C?, raum_C? }       status: aus | heizen | warmwasser | stoerung\n//\n// Solange <GERÄT>_QUELLE nicht \"geraet\" ist, tut dieser Knoten nichts.\n\nconst QUELLE_VAR = { pv: 'PV_QUELLE', netz: 'NETZ_QUELLE', batterie: 'BATTERIE_QUELLE', wallbox: 'WALLBOX_QUELLE',\n    auto: 'AUTO_QUELLE', wp: 'WP_QUELLE' }[GERAET];\nif ((env.get(QUELLE_VAR) || 'simulator') !== 'geraet') {\n    node.status({ fill: 'grey', shape: 'ring', text: 'nicht aktiv (' + QUELLE_VAR + ' ≠ geraet)' });\n    return null;\n}\n\n// ▼▼▼ Hier die Antwort des Geräts (msg.payload) umrechnen ▼▼▼\nconst roh = msg.payload;\nconst werte = null; // z. B. { leistung_W: roh.P_PV }\n// ▲▲▲\n\nif (!werte) {\n    if (!context.get('gewarnt')) {\n        context.set('gewarnt', true);\n        node.warn(`${QUELLE_VAR}=geraet, aber der Adapter für ${GERAET} ist noch nicht umgesetzt`);\n    }\n    node.status({ fill: 'yellow', shape: 'ring', text: 'Adapter noch nicht umgesetzt' });\n    return null;\n}\nnode.status({ fill: 'green', shape: 'dot', text: JSON.stringify(werte).slice(0, 60) });\nreturn { geraet: GERAET, quelle: 'geraet', payload: werte };\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "auto-lesen-mw"
+   ]
+  ],
+  "x": 350,
+  "y": 680,
+  "z": "tab-auto",
+  "g": "grp-auto-ad"
+ },
+ {
+  "id": "auto-lesen-mw",
+  "type": "link out",
+  "name": "→ Messwerte",
+  "mode": "link",
+  "links": [
+   "sys-mw-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 680,
+  "z": "tab-auto",
+  "g": "grp-auto-ad"
+ },
+ {
+  "id": "grp-auto-hand",
+  "type": "group",
+  "z": "tab-auto",
+  "name": "Ladestand von Hand",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-auto-hand-kom",
+   "auto-http-get",
+   "auto-http-post",
+   "auto-hand",
+   "auto-hand-mw",
+   "auto-hand-res"
+  ],
+  "x": 14,
+  "y": 790,
+  "w": 720,
+  "h": 230
+ },
+ {
+  "id": "grp-auto-hand-kom",
+  "type": "comment",
+  "name": "GET/POST /radler/auto?soc=55 setzt den Ladestand (für Autos ohne Schnittstelle)",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 830,
+  "z": "tab-auto",
+  "g": "grp-auto-hand"
+ },
+ {
+  "id": "auto-http-get",
+  "type": "http in",
+  "name": "GET /radler/auto",
+  "url": "/radler/auto",
+  "method": "get",
+  "upload": false,
+  "swaggerDoc": "",
+  "wires": [
+   [
+    "auto-hand"
+   ]
+  ],
+  "x": 120,
+  "y": 890,
+  "z": "tab-auto",
+  "g": "grp-auto-hand"
+ },
+ {
+  "id": "auto-http-post",
+  "type": "http in",
+  "name": "POST /radler/auto",
+  "url": "/radler/auto",
+  "method": "post",
+  "upload": false,
+  "swaggerDoc": "",
+  "wires": [
+   [
+    "auto-hand"
+   ]
+  ],
+  "x": 120,
+  "y": 950,
+  "z": "tab-auto",
+  "g": "grp-auto-hand"
+ },
+ {
+  "id": "auto-hand",
+  "type": "function",
+  "name": "Ladestand übernehmen",
+  "func": "// Ladestand des Autos von Hand setzen: GET/POST http://<pi>:1880/radler/auto?soc=55\n// Für Autos ohne abrufbaren Ladestand (AUTO_QUELLE = manuell). Gilt WB_SOC_MAX_ALTER_MIN lang, danach plant die\n// Ladeplanung nach „teuerste Stunden“.\n// ─ Ausgang 1: Messwert → Link „→ Messwerte“\n// ─ Ausgang 2: HTTP-Antwort\n\nconst q = Object.assign({}, msg.req && msg.req.query, typeof msg.payload === 'object' ? msg.payload : {});\nconst soc = parseFloat(q.soc);\nif (isNaN(soc) || soc < 0 || soc > 100) {\n    return [null, { statusCode: 400, payload: { fehler: 'soc fehlt oder ungültig (0–100)' }, res: msg.res }];\n}\nnode.status({ fill: 'green', shape: 'dot', text: `Auto ${soc} % (von Hand)` });\nreturn [{ geraet: 'auto', quelle: 'manuell', payload: { soc_pct: soc } },\n        { statusCode: 200, payload: { ok: true, soc_pct: soc }, res: msg.res }];\n",
+  "outputs": 2,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "auto-hand-mw"
+   ],
+   [
+    "auto-hand-res"
+   ]
+  ],
+  "x": 350,
+  "y": 890,
+  "z": "tab-auto",
+  "g": "grp-auto-hand"
+ },
+ {
+  "id": "auto-hand-mw",
+  "type": "link out",
+  "name": "→ Messwerte",
+  "mode": "link",
+  "links": [
+   "sys-mw-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 890,
+  "z": "tab-auto",
+  "g": "grp-auto-hand"
+ },
+ {
+  "id": "auto-hand-res",
+  "type": "http response",
+  "name": "Antwort",
+  "statusCode": "",
+  "headers": {},
+  "wires": [],
+  "x": 580,
+  "y": 950,
+  "z": "tab-auto",
+  "g": "grp-auto-hand"
+ },
+ {
+  "id": "tab-wp",
+  "type": "tab",
+  "label": "🌡️ Wärmepumpe",
+  "disabled": false,
+  "info": "Steuerung (Anhebung bei PV-Überschuss und günstigem Strom, nie mitten im Heizlauf), Befehl (SG-Ready und Sollwertanhebung) und Adapter. Siehe docs/waermepumpe.md."
+ },
+ {
+  "id": "grp-wp-st",
+  "type": "group",
+  "z": "tab-wp",
+  "name": "Steuerung",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-wp-st-kom",
+   "wp-st-inj",
+   "wp-st",
+   "wp-st-db",
+   "wp-st-log",
+   "wp-bef",
+   "wp-bef-ad"
+  ],
+  "x": 14,
+  "y": 40,
+  "w": 950,
+  "h": 290
+ },
+ {
+  "id": "grp-wp-st-kom",
+  "type": "comment",
+  "name": "Jede Minute: Anhebung 0 … +2 K, SG-Ready 2/3, Warmwasser absenken → InfluxDB „wp_steuerung“",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 80,
+  "z": "tab-wp",
+  "g": "grp-wp-st"
+ },
+ {
+  "id": "wp-st-inj",
+  "type": "inject",
+  "name": "jede Minute",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "60",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "45",
+  "topic": "",
+  "wires": [
+   [
+    "wp-st"
+   ]
+  ],
+  "x": 120,
+  "y": 140,
+  "z": "tab-wp",
+  "g": "grp-wp-st"
+ },
+ {
+  "id": "wp-st",
+  "type": "function",
+  "name": "Wärmepumpe steuern",
+  "func": "// 🌡️ Wärmepumpe steuern (jede Minute): Anhebung bei PV-Überschuss und günstigem Strom, nie mitten im Heizlauf\n// Übernommen aus Haus-EMS (docs/waermepumpe.md), geräteunabhängig: der Befehl enthält SG-Ready-Zustand UND\n// Sollwertanhebung; der Adapter nimmt, was seine Wärmepumpe kann.\n// ─ Eingang: Inject jede Minute\n// ─ Ausgang 1: Befehl (msg.befehl = { sgready: 2|3, anhebung_K, ww_absenken, grund }) → Link „Befehl Wärmepumpe“\n// ─ Ausgang 2: InfluxDB-Punkt (Bucket ems, Messreihe \"wp_steuerung\")\n// ─ Ausgang 3: msg.log bei geänderter Anhebung\n// ─ Liest: global.abbild (wp.status, wp.leistung_W, wp.aussen_C oder wetter.temperatur_C, wp.raum_C),\n//          global.ems_live, global.ems_plan\n// ─ Umgebung: WP_MODUS, WP_HEIZGRENZE_C, ANHEBUNG_PV_K, ANHEBUNG_GUENSTIG_K, WP_GUENSTIG_ANTEIL, PV_START_W, PV_HALTEN_W,\n//             PV_AUS_MIN, PV_AKKU_SOC, WP_PV_PROGNOSE_WH, RAUM_MAX_C, NACHHEIZ_K, NACHHEIZ_MIN, WW_NACHT_VON, WW_NACHT_BIS\n//\n// SG-Ready: 1 = Sperre (nicht genutzt), 2 = Normalbetrieb, 3 = Einschaltempfehlung (mehr heizen), 4 = Anlaufbefehl (nicht genutzt)\n\nconst jetzt = Date.now();\nconst abbild = global.get('abbild') || {};\nfunction wert(s, maxS) { const e = abbild[s]; return e && jetzt - e.zeit <= maxS * 1000 ? e.wert : null; }\nfunction zahl(n, std) { const v = parseFloat(env.get(n)); return isNaN(v) ? std : v; }\nfunction text(n, std) { const v = env.get(n); return v === undefined || v === null || v === '' ? std : String(v); }\nconst stunde = t => parseInt(new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: 'numeric', hourCycle: 'h23' }).format(t), 10);\n\nconst modus = text('WP_MODUS', 'beobachten');\nconst st = context.get('st') || { anhebung: 0, pvFenster: false, pvSeit: 0, pvUnterSeit: 0, zuWarm: false, geaendert: 0,\n    lief: false, wwVorher: false, nachheizBis: 0 };\n\n// Außentemperatur, Mittel 24 h (Proben alle 10 min)\nconst aussen = wert('wp.aussen_C', 900) ?? wert('wetter.temperatur_C', 1800);\nconst proben = (context.get('aussen') || []).filter(x => jetzt - x[0] <= 86400000);\nif (aussen !== null && (!proben.length || jetzt - proben[proben.length - 1][0] >= 600000)) proben.push([jetzt, aussen]);\ncontext.set('aussen', proben);\nconst aussen24 = proben.length ? proben.reduce((a, x) => a + x[1], 0) / proben.length : null;\nconst heizzeit = aussen24 === null ? true : aussen24 < zahl('WP_HEIZGRENZE_C', 15);\n\n// Räume zu warm? (optional; ohne Raumwert gilt „nicht zu warm“)\nconst raum = wert('wp.raum_C', 3600);\nconst raumMax = zahl('RAUM_MAX_C', 22);\nif (raum !== null) st.zuWarm = st.zuWarm ? raum > raumMax - 0.3 : raum >= raumMax;\nelse st.zuWarm = false;\n\nconst status = wert('wp.status', 300);               // 'aus' | 'heizen' | 'warmwasser' | 'stoerung'\nconst heizt = status === 'heizen';\nconst wpW = wert('wp.leistung_W', 300) || 0;\n\n// Überschuss: Einspeisung minus Akku-Entladung plus Strom der Wärmepumpe (Mittel 5 min);\n// ab PV_AKKU_SOC zählt auch die Ladung des Akkus (er ist fast voll)\nconst live = global.get('ems_live');\nlet ue = null;\nif (live && jetzt - live.zeit < 120000) {\n    const wpMittel = (context.get('wpw') || []).filter(x => jetzt - x[0] <= 300000);\n    wpMittel.push([jetzt, wpW]); context.set('wpw', wpMittel);\n    ue = live.frei_W + wpMittel.reduce((a, x) => a + x[1], 0) / wpMittel.length;\n    if (live.soc !== null && live.soc >= zahl('PV_AKKU_SOC', 80)) ue += live.laden_W || 0;\n}\n\n// PV-Fenster: öffnet ab PV_START_W, endet erst, wenn der Überschuss PV_AUS_MIN unter PV_HALTEN_W liegt,\n// frühestens nach 30 min und nie in einem Heizlauf\nif (ue !== null && ue >= zahl('PV_START_W', 1500) && !st.pvFenster) { st.pvFenster = true; st.pvSeit = jetzt; st.pvUnterSeit = 0; }\nif (st.pvFenster) {\n    if (ue === null || ue < zahl('PV_HALTEN_W', 1000)) st.pvUnterSeit = st.pvUnterSeit || jetzt; else st.pvUnterSeit = 0;\n    if (st.pvUnterSeit && jetzt - st.pvUnterSeit >= zahl('PV_AUS_MIN', 20) * 60000 && jetzt - st.pvSeit >= 30 * 60000 && !heizt) {\n        st.pvFenster = false;\n    }\n}\n\n// Günstiges Fenster: die laufende Stunde gehört zu den billigsten WP_GUENSTIG_ANTEIL der bekannten Preise\n// und die Sonne bringt in 12 h wenig\nconst plan = global.get('ems_plan');\nlet guenstig = false;\nif (plan && jetzt - plan.zeit < 20 * 60000 && plan.preise && plan.preise.length) {\n    const h0 = Math.floor(jetzt / 3600000) * 3600000;\n    const liste = plan.preise.filter(p => p.t >= h0);\n    const n = Math.max(1, Math.floor(liste.length * zahl('WP_GUENSTIG_ANTEIL', 0.25)));\n    const billig = new Set(liste.slice().sort((a, b) => a.ct - b.ct).slice(0, n).map(p => p.t));\n    guenstig = billig.has(h0) && plan.pv12h_Wh < zahl('WP_PV_PROGNOSE_WH', 15000);\n}\n\n// Warmwasser eben fertig → kurz anheben, damit der Heizlauf direkt anschließt (spart Kompressorstarts)\nconst ww = status === 'warmwasser';\nif (st.wwVorher && !ww) st.nachheizBis = jetzt + zahl('NACHHEIZ_MIN', 3) * 60000;\nst.wwVorher = ww;\n\nlet ziel = 0, grund;\nif (!heizzeit) grund = `keine Heizzeit (außen Ø ${aussen24.toFixed(1)} °C)`;\nelse if (st.zuWarm) grund = `Räume zu warm (${raum} °C)`;\nelse if (st.pvFenster) { ziel = zahl('ANHEBUNG_PV_K', 2); grund = `PV-Überschuss ${Math.round(ue || 0)} W`; }\nelse if (guenstig) { ziel = zahl('ANHEBUNG_GUENSTIG_K', 2); grund = 'günstiger Strom'; }\nelse grund = 'normal';\nif (jetzt < st.nachheizBis && ziel < zahl('NACHHEIZ_K', 0.5) && heizzeit) { ziel = zahl('NACHHEIZ_K', 0.5); grund = 'Heizlauf an Warmwasser anhängen'; }\n\n// Anhebung endet erst nach dem Heizlauf; sonst ändert sie sich höchstens alle 2 min (Nachheizen sofort)\nlet anhebung = st.anhebung;\nif (modus === 'aus') { anhebung = 0; grund = 'Steuerung aus'; }\nelse if (ziel < st.anhebung && heizt) grund += ', bis Ende Heizlauf';\nelse if (ziel !== st.anhebung && (jetzt - st.geaendert >= 120000 || grund.startsWith('Heizlauf an'))) { anhebung = ziel; }\nconst geaendert = anhebung !== st.anhebung;\nif (geaendert) st.geaendert = jetzt;\n\n// Warmwasser absenken (falls die Wärmepumpe einen Sollwert annimmt): nachts und während einer Anhebung ab 1 K,\n// damit die Wärme in den Estrich geht und das Warmwasser keinen Heizlauf unterbricht\nconst h = stunde(jetzt);\nconst nachtVon = zahl('WW_NACHT_VON', 1), nachtBis = zahl('WW_NACHT_BIS', 5);\nconst wwAbsenken = modus !== 'aus' && ((h >= nachtVon && h < nachtBis) || anhebung >= 1 || heizt);\n\nconst befehl = { sgready: anhebung > 0 ? 3 : 2, anhebung_K: anhebung, ww_absenken: wwAbsenken };\nconst senden = modus === 'aktiv' && (geaendert || JSON.stringify(befehl) !== JSON.stringify(st.befehl) || jetzt - (st.gesendet || 0) >= 15 * 60000);\nif (senden) st.gesendet = jetzt;\nconst logs = [];\nif (geaendert) logs.push({ log: { stufe: 'info', bereich: 'wp',\n    text: `Wärmepumpe: Anhebung ${st.anhebung} → ${anhebung} K (SG-Ready ${befehl.sgready}): ${grund}` + (modus !== 'aktiv' ? ` (WP_MODUS=${modus})` : '') } });\nst.anhebung = anhebung; st.befehl = befehl;\ncontext.set('st', st);\n\nconst fields = { anhebung_K: anhebung, ziel_K: ziel, sgready: befehl.sgready, grund, heizzeit: heizzeit ? 1 : 0,\n    pv_fenster: st.pvFenster ? 1 : 0, guenstig: guenstig ? 1 : 0, heizen: heizt ? 1 : 0, ww_absenken: wwAbsenken ? 1 : 0,\n    gesendet: senden ? 1 : 0 };\nif (ue !== null) fields.ueberschuss_W = Math.round(ue);\nif (raum !== null) fields.raum_C = raum;\nif (aussen24 !== null) fields.aussen24_C = +aussen24.toFixed(1);\n\nnode.status({ fill: anhebung > 0 ? 'blue' : 'green', shape: senden ? 'dot' : 'ring',\n    text: `+${anhebung} K (SG ${befehl.sgready}) – ${grund}` + (modus !== 'aktiv' ? ` · ${modus}` : '') });\nreturn [senden ? { befehl: Object.assign({ grund, zeit: jetzt }, befehl) } : null,\n        { payload: [{ measurement: 'wp_steuerung', tags: { quelle: 'ems' }, fields, timestamp: new Date(jetzt) }] },\n        logs.length ? logs : null];\n",
+  "outputs": 3,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "wp-bef"
+   ],
+   [
+    "wp-st-db"
+   ],
+   [
+    "wp-st-log"
+   ]
+  ],
+  "x": 350,
+  "y": 140,
+  "z": "tab-wp",
+  "g": "grp-wp-st"
+ },
+ {
+  "id": "wp-st-db",
+  "type": "link out",
+  "name": "→ Influx ems",
+  "mode": "link",
+  "links": [
+   "sys-db-ems-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 200,
+  "z": "tab-wp",
+  "g": "grp-wp-st"
+ },
+ {
+  "id": "wp-st-log",
+  "type": "link out",
+  "name": "→ Log",
+  "mode": "link",
+  "links": [
+   "log-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 260,
+  "z": "tab-wp",
+  "g": "grp-wp-st"
+ },
+ {
+  "id": "wp-bef",
+  "type": "function",
+  "name": "Befehl verteilen",
+  "func": "const GERAET = 'wp';\n// Befehl verteilen (je Gerät, GERAET steht in der ersten Zeile, vom Generator eingesetzt)\n// ─ Eingang: msg.befehl vom EMS (Batterie), von der Ladeplanung (Wallbox) oder der Wärmepumpen-Steuerung\n// ─ Ausgang 1: an den Geräte-Adapter (nur wenn <GERÄT>_QUELLE = geraet)\n// ─ Kontext: global.befehl_<geraet> = letzter Befehl (der Simulator liest ihn von dort)\n//            global.abbild['befehl.<geraet>'] (zur Anzeige)\n// ─ Umgebung: <GERÄT>_QUELLE: simulator (Standard) | geraet | aus\n\nconst QUELLE_VAR = { batterie: 'BATTERIE_QUELLE', wallbox: 'WALLBOX_QUELLE', wp: 'WP_QUELLE' }[GERAET];\nconst quelle = env.get(QUELLE_VAR) || 'simulator';\nconst b = msg.befehl;\nif (!b) return null;\nglobal.set('befehl_' + GERAET, b);\nconst abbild = global.get('abbild') || {};\nabbild['befehl.' + GERAET] = { wert: b, einheit: '', zeit: Date.now(), quelle: 'ems' };\nglobal.set('abbild', abbild);\n\nconst kurz = Object.entries(b).filter(([k]) => !['grund', 'zeit'].includes(k)).map(([k, v]) => `${k}=${v}`).join(' ');\nnode.status({ fill: quelle === 'aus' ? 'grey' : 'green', shape: 'dot', text: `${quelle}: ${kurz}` });\nreturn quelle === 'geraet' ? msg : null;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "wp-bef-ad"
+   ]
+  ],
+  "x": 580,
+  "y": 140,
+  "z": "tab-wp",
+  "g": "grp-wp-st"
+ },
+ {
+  "id": "wp-bef-ad",
+  "type": "function",
+  "name": "Adapter wp: senden (Vorlage)",
+  "func": "const GERAET = 'wp';\n// VORLAGE – Adapter: Befehl ans Gerät senden (GERAET steht in der ersten Zeile)\n// Hier wird beim Hackathon das echte Gerät angebunden. Siehe docs/geraete-adapter.md.\n//\n// Eingang msg.befehl (nur, wenn <GERÄT>_QUELLE = geraet):\n//   batterie: { modus: 'eigenverbrauch' }\n//             { modus: 'laden', leistung_W }                        aus dem Netz laden\n//             { modus: 'begrenzt', max_laden_W, max_entladen_W }    null = keine Grenze, 0 = gesperrt\n//   wallbox:  { modus: 'frei' } | { modus: 'pause' } | { modus: 'strom', ampere }\n//   wp:       { sgready: 2|3, anhebung_K, ww_absenken }\n// Ausgang → HTTP-/Modbus-/MQTT-Knoten des Geräts.\n// Sicherheit: Gerät so einstellen, dass es ohne neuen Befehl nach einigen Minuten in den Normalbetrieb fällt\n// (Timeout), sonst bleibt bei einem Ausfall von Node-RED der letzte Befehl stehen.\n\nconst b = msg.befehl;\n\n// ▼▼▼ Hier den Befehl in Register/Anfrage des Geräts übersetzen ▼▼▼\nconst anfrage = null; // z. B. { payload: { value: b.max_laden_W, fc: 6, unitid: 1, address: 1234, quantity: 1 } }\n// ▲▲▲\n\nif (!anfrage) {\n    if (!context.get('gewarnt')) {\n        context.set('gewarnt', true);\n        node.warn(`Befehl für ${GERAET} kann nicht gesendet werden: Adapter noch nicht umgesetzt`);\n    }\n    node.status({ fill: 'yellow', shape: 'ring', text: 'Adapter noch nicht umgesetzt' });\n    return null;\n}\nnode.status({ fill: 'green', shape: 'dot', text: JSON.stringify(b).slice(0, 60) });\nreturn anfrage;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   []
+  ],
+  "x": 810,
+  "y": 140,
+  "z": "tab-wp",
+  "g": "grp-wp-st"
+ },
+ {
+  "id": "grp-wp-ad",
+  "type": "group",
+  "z": "tab-wp",
+  "name": "Adapter Wärmepumpe",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-wp-ad-kom",
+   "wp-lesen-inj",
+   "wp-lesen",
+   "wp-lesen-mw"
+  ],
+  "x": 14,
+  "y": 370,
+  "w": 720,
+  "h": 170
+ },
+ {
+  "id": "grp-wp-ad-kom",
+  "type": "comment",
+  "name": "Vorlage: { leistung_W, status, aussen_C?, raum_C? }",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 410,
+  "z": "tab-wp",
+  "g": "grp-wp-ad"
+ },
+ {
+  "id": "wp-lesen-inj",
+  "type": "inject",
+  "name": "alle 60 s",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "60",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "10",
+  "topic": "",
+  "wires": [
+   [
+    "wp-lesen"
+   ]
+  ],
+  "x": 120,
+  "y": 470,
+  "z": "tab-wp",
+  "g": "grp-wp-ad"
+ },
+ {
+  "id": "wp-lesen",
+  "type": "function",
+  "name": "Adapter wp: lesen (Vorlage)",
+  "func": "const GERAET = 'wp';\n// VORLAGE – Adapter: Messwerte lesen (GERAET steht in der ersten Zeile)\n// Hier wird beim Hackathon das echte Gerät angebunden. Siehe docs/geraete-adapter.md.\n//\n// Aufgabe: das Gerät abfragen (vorgeschaltet: HTTP-, Modbus- oder MQTT-Knoten) und die Werte in das\n// einheitliche Format bringen. Ausgang → Link „→ Messwerte“:\n//   msg.geraet = GERAET\n//   msg.quelle = 'geraet'\n//   msg.payload = { … } mit genau diesen Feldern (fehlende weglassen):\n//     pv:       { leistung_W }                                   (≥ 0)\n//     netz:     { bezug_W }                                      (> 0 Bezug, < 0 Einspeisung)\n//     batterie: { soc_pct, leistung_W }                          (leistung_W > 0 Entladen, < 0 Laden)\n//     wallbox:  { leistung_W, status, ampere }                   status: getrennt | angesteckt | laedt | pausiert | stoerung\n//     auto:     { soc_pct }                                      (Ladestand des Autos, falls abrufbar)\n//     wp:       { leistung_W, status, aussen_C?, raum_C? }       status: aus | heizen | warmwasser | stoerung\n//\n// Solange <GERÄT>_QUELLE nicht \"geraet\" ist, tut dieser Knoten nichts.\n\nconst QUELLE_VAR = { pv: 'PV_QUELLE', netz: 'NETZ_QUELLE', batterie: 'BATTERIE_QUELLE', wallbox: 'WALLBOX_QUELLE',\n    auto: 'AUTO_QUELLE', wp: 'WP_QUELLE' }[GERAET];\nif ((env.get(QUELLE_VAR) || 'simulator') !== 'geraet') {\n    node.status({ fill: 'grey', shape: 'ring', text: 'nicht aktiv (' + QUELLE_VAR + ' ≠ geraet)' });\n    return null;\n}\n\n// ▼▼▼ Hier die Antwort des Geräts (msg.payload) umrechnen ▼▼▼\nconst roh = msg.payload;\nconst werte = null; // z. B. { leistung_W: roh.P_PV }\n// ▲▲▲\n\nif (!werte) {\n    if (!context.get('gewarnt')) {\n        context.set('gewarnt', true);\n        node.warn(`${QUELLE_VAR}=geraet, aber der Adapter für ${GERAET} ist noch nicht umgesetzt`);\n    }\n    node.status({ fill: 'yellow', shape: 'ring', text: 'Adapter noch nicht umgesetzt' });\n    return null;\n}\nnode.status({ fill: 'green', shape: 'dot', text: JSON.stringify(werte).slice(0, 60) });\nreturn { geraet: GERAET, quelle: 'geraet', payload: werte };\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "wp-lesen-mw"
+   ]
+  ],
+  "x": 350,
+  "y": 470,
+  "z": "tab-wp",
+  "g": "grp-wp-ad"
+ },
+ {
+  "id": "wp-lesen-mw",
+  "type": "link out",
+  "name": "→ Messwerte",
+  "mode": "link",
+  "links": [
+   "sys-mw-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 470,
+  "z": "tab-wp",
+  "g": "grp-wp-ad"
+ },
+ {
+  "id": "tab-markt",
+  "type": "tab",
+  "label": "💶 Preise & Prognose",
+  "disabled": false,
+  "info": "Strompreise (Energy-Charts, Viertelstunden), PV-Prognose (Open-Meteo, Einstrahlung je Dachfläche) und Wetter am Standort. Alles ohne Anmeldung. Bucket „markt“."
+ },
+ {
+  "id": "grp-preise",
+  "type": "group",
+  "z": "tab-markt",
+  "name": "Strompreise",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-preise-kom",
+   "mk-pr-inj",
+   "mk-pr-q",
+   "mk-pr-http",
+   "mk-pr",
+   "mk-pr-db",
+   "mk-pr-log"
+  ],
+  "x": 14,
+  "y": 40,
+  "w": 1180,
+  "h": 230
+ },
+ {
+  "id": "grp-preise-kom",
+  "type": "comment",
+  "name": "Stündlich: Day-Ahead DE-LU + ABGABEN_CT → „strompreis“, Stundenpreise ins Prozessabbild",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 80,
+  "z": "tab-markt",
+  "g": "grp-preise"
+ },
+ {
+  "id": "mk-pr-inj",
+  "type": "inject",
+  "name": "stündlich",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "3600",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "3",
+  "topic": "",
+  "wires": [
+   [
+    "mk-pr-q"
+   ]
+  ],
+  "x": 120,
+  "y": 140,
+  "z": "tab-markt",
+  "g": "grp-preise"
+ },
+ {
+  "id": "mk-pr-q",
+  "type": "function",
+  "name": "Abfrage bauen",
+  "func": "// Strompreise abfragen: Day-Ahead DE-LU von Energy-Charts (Fraunhofer ISE, CC BY 4.0, ohne Anmeldung)\n// ─ Eingang: Inject stündlich und beim Start\n// ─ Ausgang 1: msg.url für den HTTP-Knoten (heute bis übermorgen; die Preise für morgen kommen gegen 13 Uhr)\n// ─ Umgebung: PREIS_ZONE (DE-LU)\n\nconst tag = t => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(t);\nconst jetzt = Date.now();\nconst zone = env.get('PREIS_ZONE') || 'DE-LU';\nmsg.url = `https://api.energy-charts.info/price?bzn=${encodeURIComponent(zone)}&start=${tag(jetzt)}&end=${tag(jetzt + 2 * 86400000)}`;\nreturn msg;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "mk-pr-http"
+   ]
+  ],
+  "x": 350,
+  "y": 140,
+  "z": "tab-markt",
+  "g": "grp-preise"
+ },
+ {
+  "id": "mk-pr-http",
+  "type": "http request",
+  "name": "Energy-Charts",
+  "method": "GET",
+  "ret": "obj",
+  "paytoqs": "ignore",
+  "url": "",
+  "tls": "",
+  "persist": false,
+  "proxy": "",
+  "insecureHTTPParser": false,
+  "authType": "",
+  "senderr": false,
+  "headers": [],
+  "wires": [
+   [
+    "mk-pr"
+   ]
+  ],
+  "x": 580,
+  "y": 140,
+  "z": "tab-markt",
+  "g": "grp-preise"
+ },
+ {
+  "id": "mk-pr",
+  "type": "function",
+  "name": "Preise auswerten",
+  "func": "// Strompreise auswerten\n// ─ Eingang: Antwort von Energy-Charts { unix_seconds: [...], price: [...] (EUR/MWh) }\n// ─ Ausgang 1: InfluxDB-Punkte (Bucket markt, Messreihe \"strompreis\": boerse_ct, preis_ct je Viertelstunde)\n// ─ Ausgang 2: msg.log bei Fehlern\n// ─ Umgebung: ABGABEN_CT (18): Netzentgelt, Steuern, Umlagen, Marge; der Endpreis ist Börse + ABGABEN_CT\n// ─ Kontext: global.abbild['markt.preise'] = Stundenpreise ab der laufenden Stunde [{ t, ct }] (Endpreis),\n//            global.abbild['markt.preise_15'] = Viertelstunden [{ t, ct }]\n\nconst p = msg.payload;\nif (!p || !Array.isArray(p.unix_seconds) || !Array.isArray(p.price) || !p.unix_seconds.length) {\n    node.status({ fill: 'red', shape: 'dot', text: 'keine Preise (HTTP ' + msg.statusCode + ')' });\n    return [null, { log: { stufe: 'warnung', bereich: 'preise', text: 'Strompreise nicht abrufbar (HTTP ' + msg.statusCode + ')' } }];\n}\nconst abgaben = parseFloat(env.get('ABGABEN_CT'));\nconst aufschlag = isNaN(abgaben) ? 18 : abgaben;\n\nconst viertel = [];\nconst punkte = [];\np.unix_seconds.forEach((s, i) => {\n    const boerse = p.price[i];\n    if (typeof boerse !== 'number') return;\n    const t = s * 1000;\n    const ct = +(boerse / 10 + aufschlag).toFixed(3);\n    viertel.push({ t, ct });\n    punkte.push({ measurement: 'strompreis', tags: { quelle: 'energy-charts' },\n        fields: { boerse_ct: +(boerse / 10).toFixed(3), preis_ct: ct }, timestamp: new Date(t) });\n});\n\n// Stundenmittel ab der laufenden Stunde (die Regelung rechnet stündlich wie in Haus-EMS)\nconst stunden = {};\nfor (const v of viertel) {\n    const h = Math.floor(v.t / 3600000) * 3600000;\n    (stunden[h] = stunden[h] || []).push(v.ct);\n}\nconst ab = Math.floor(Date.now() / 3600000) * 3600000;\nconst liste = Object.keys(stunden).map(Number).sort((a, b) => a - b).filter(h => h >= ab)\n    .map(h => ({ t: h, ct: +(stunden[h].reduce((a, b) => a + b, 0) / stunden[h].length).toFixed(2) }));\n\nconst abbild = global.get('abbild') || {};\nconst jetzt = Date.now();\nabbild['markt.preise'] = { wert: liste, einheit: 'ct/kWh', zeit: jetzt, quelle: 'energy-charts' };\nabbild['markt.preise_15'] = { wert: viertel.filter(v => v.t >= ab), einheit: 'ct/kWh', zeit: jetzt, quelle: 'energy-charts' };\nif (liste.length) abbild['markt.preis_jetzt_ct'] = { wert: liste[0].ct, einheit: 'ct/kWh', zeit: jetzt, quelle: 'energy-charts' };\nglobal.set('abbild', abbild);\n\nconst bis = liste.length ? new Date(liste[liste.length - 1].t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'short', hour: '2-digit' }) : '–';\nnode.status({ fill: 'green', shape: 'dot', text: `${liste.length} h bekannt, bis ${bis} Uhr · jetzt ${liste.length ? liste[0].ct.toFixed(1) : '–'} ct` });\nreturn [{ payload: punkte }, null];\n",
+  "outputs": 2,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "mk-pr-db"
+   ],
+   [
+    "mk-pr-log"
+   ]
+  ],
+  "x": 810,
+  "y": 140,
+  "z": "tab-markt",
+  "g": "grp-preise"
+ },
+ {
+  "id": "mk-pr-db",
+  "type": "link out",
+  "name": "→ Influx markt",
+  "mode": "link",
+  "links": [
+   "sys-db-markt-in"
+  ],
+  "wires": [],
+  "x": 1040,
+  "y": 140,
+  "z": "tab-markt",
+  "g": "grp-preise"
+ },
+ {
+  "id": "mk-pr-log",
+  "type": "link out",
+  "name": "→ Log",
+  "mode": "link",
+  "links": [
+   "log-in"
+  ],
+  "wires": [],
+  "x": 1040,
+  "y": 200,
+  "z": "tab-markt",
+  "g": "grp-preise"
+ },
+ {
+  "id": "grp-prognose",
+  "type": "group",
+  "z": "tab-markt",
+  "name": "PV-Prognose",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-prognose-kom",
+   "mk-pg-inj",
+   "mk-pg-q",
+   "mk-pg-http",
+   "mk-pg-fl",
+   "mk-pg-join",
+   "mk-pg",
+   "mk-pg-db",
+   "mk-pg-log"
+  ],
+  "x": 14,
+  "y": 310,
+  "w": 1640,
+  "h": 230
+ },
+ {
+  "id": "grp-prognose-kom",
+  "type": "comment",
+  "name": "Stündlich: Einstrahlung je Dachfläche (PV_FLAECHEN) × kWp × PV_PR → „pv_prognose“, ins Prozessabbild",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 350,
+  "z": "tab-markt",
+  "g": "grp-prognose"
+ },
+ {
+  "id": "mk-pg-inj",
+  "type": "inject",
+  "name": "stündlich",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "3600",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "5",
+  "topic": "",
+  "wires": [
+   [
+    "mk-pg-q"
+   ]
+  ],
+  "x": 120,
+  "y": 410,
+  "z": "tab-markt",
+  "g": "grp-prognose"
+ },
+ {
+  "id": "mk-pg-q",
+  "type": "function",
+  "name": "Abfrage je Fläche",
+  "func": "// PV-Prognose abfragen: Open-Meteo, Einstrahlung auf die geneigte Modulfläche (ohne Anmeldung)\n// ─ Eingang: Inject stündlich und beim Start\n// ─ Ausgang 1: je Dachfläche eine Nachricht mit msg.url und msg.flaeche, mit msg.parts für den Join-Knoten\n// ─ Umgebung: STANDORT_LAT, STANDORT_LON,\n//             PV_FLAECHEN = \"Neigung/Azimut/kWp;…\", Azimut wie Open-Meteo: 0 = Süd, -90 = Ost, 90 = West\n//             Beispiel: \"35/-90/4.5;35/90/4.5\" (Ost-West-Dach mit je 4,5 kWp). Standard: \"30/0/8\"\n\nconst lat = parseFloat(env.get('STANDORT_LAT')) || 51.16; // ohne Einstellung: Mitte Deutschlands (Warnung beim Start)\nconst lon = parseFloat(env.get('STANDORT_LON')) || 10.45;\nconst flaechen = String(env.get('PV_FLAECHEN') || '30/0/8').split(';')\n    .map(s => s.trim()).filter(Boolean)\n    .map(s => { const [neigung, azimut, kwp] = s.split('/').map(parseFloat); return { neigung, azimut, kwp }; })\n    .filter(f => [f.neigung, f.azimut, f.kwp].every(x => !isNaN(x)));\nif (!flaechen.length) {\n    node.status({ fill: 'red', shape: 'dot', text: 'PV_FLAECHEN ungültig' });\n    return null;\n}\nconst id = 'prognose-' + Date.now();\nnode.status({ fill: 'blue', shape: 'dot', text: `${flaechen.length} Fläche(n), ${flaechen.reduce((a, f) => a + f.kwp, 0)} kWp` });\nreturn [flaechen.map((f, i) => ({\n    flaeche: f,\n    url: `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +\n         `&hourly=global_tilted_irradiance,temperature_2m&tilt=${f.neigung}&azimuth=${f.azimut}` +\n         `&past_days=1&forecast_days=2&timeformat=unixtime&timezone=UTC`,\n    parts: { id, index: i, count: flaechen.length, type: 'array' },\n}))];\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "mk-pg-http"
+   ]
+  ],
+  "x": 350,
+  "y": 410,
+  "z": "tab-markt",
+  "g": "grp-prognose"
+ },
+ {
+  "id": "mk-pg-http",
+  "type": "http request",
+  "name": "Open-Meteo",
+  "method": "GET",
+  "ret": "obj",
+  "paytoqs": "ignore",
+  "url": "",
+  "tls": "",
+  "persist": false,
+  "proxy": "",
+  "insecureHTTPParser": false,
+  "authType": "",
+  "senderr": false,
+  "headers": [],
+  "wires": [
+   [
+    "mk-pg-fl"
+   ]
+  ],
+  "x": 580,
+  "y": 410,
+  "z": "tab-markt",
+  "g": "grp-prognose"
+ },
+ {
+  "id": "mk-pg-fl",
+  "type": "function",
+  "name": "Fläche anhängen",
+  "func": "// Antwort und Dachfläche zusammenpacken, damit „Prognose auswerten“ die kWp kennt\nmsg.payload = { antwort: msg.payload, flaeche: msg.flaeche };\nreturn msg;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "mk-pg-join"
+   ]
+  ],
+  "x": 810,
+  "y": 410,
+  "z": "tab-markt",
+  "g": "grp-prognose"
+ },
+ {
+  "id": "mk-pg-join",
+  "type": "join",
+  "name": "alle Flächen",
+  "mode": "auto",
+  "build": "array",
+  "property": "payload",
+  "propertyType": "msg",
+  "key": "topic",
+  "joiner": "\\n",
+  "joinerType": "str",
+  "useparts": true,
+  "accumulate": false,
+  "timeout": "60",
+  "count": "",
+  "reduceRight": false,
+  "reduceExp": "",
+  "reduceInit": "",
+  "reduceInitType": "",
+  "reduceFixup": "",
+  "wires": [
+   [
+    "mk-pg"
+   ]
+  ],
+  "x": 1040,
+  "y": 410,
+  "z": "tab-markt",
+  "g": "grp-prognose"
+ },
+ {
+  "id": "mk-pg",
+  "type": "function",
+  "name": "Prognose auswerten",
+  "func": "// PV-Prognose auswerten\n// ─ Eingang: msg.payload = [{ antwort, flaeche }, …] vom Join-Knoten, eine je Dachfläche\n//            (der Knoten \"Fläche anhängen\" packt Open-Meteo-Antwort und Fläche mit kWp zusammen)\n// ─ Ausgang 1: InfluxDB-Punkte (Bucket markt, Messreihe \"pv_prognose\": leistung_W je Stunde)\n// ─ Ausgang 2: msg.log bei Fehlern\n// ─ Umgebung: PV_PR (Performance Ratio, 0,85): Verluste durch Wechselrichter, Kabel, Wärme, Verschmutzung\n// ─ Kontext: global.abbild['prognose.pv'] = [{ t (Beginn der Stunde), W }]\n// Open-Meteo gibt Strahlung als Mittel der VORANGEGANGENEN Stunde an: der Wert mit Zeitstempel t gilt für t-1h … t.\n\nconst pr = parseFloat(env.get('PV_PR')) || 0.85;\nconst antworten = Array.isArray(msg.payload) ? msg.payload : [];\nconst summe = {};\nlet ok = 0;\nfor (const a of antworten) {\n    const h = a && a.antwort && a.antwort.hourly;\n    if (!h || !Array.isArray(h.time)) continue;\n    ok++;\n    h.time.forEach((s, i) => {\n        const gti = h.global_tilted_irradiance[i];\n        if (typeof gti !== 'number') return;\n        const t = (s - 3600) * 1000;\n        summe[t] = (summe[t] || 0) + gti * a.flaeche.kwp * pr; // W/m² × kWp = W bei 1000 W/m² Normstrahlung\n    });\n}\nif (!ok) {\n    node.status({ fill: 'red', shape: 'dot', text: 'keine Prognose' });\n    return [null, { log: { stufe: 'warnung', bereich: 'prognose', text: 'PV-Prognose nicht abrufbar' } }];\n}\nconst liste = Object.keys(summe).map(Number).sort((a, b) => a - b).map(t => ({ t, W: Math.round(summe[t]) }));\nconst abbild = global.get('abbild') || {};\nabbild['prognose.pv'] = { wert: liste, einheit: 'W', zeit: Date.now(), quelle: 'open-meteo' };\nglobal.set('abbild', abbild);\n\nconst ab = Math.floor(Date.now() / 3600000) * 3600000;\nconst heute = liste.filter(x => x.t >= ab && x.t < ab + 24 * 3600000).reduce((a, x) => a + x.W, 0);\nnode.status({ fill: 'green', shape: 'dot', text: `${ok} Fläche(n) · nächste 24 h ${(heute / 1000).toFixed(1)} kWh` });\nreturn [{ payload: liste.map(x => ({ measurement: 'pv_prognose', tags: { quelle: 'open-meteo' },\n    fields: { leistung_W: x.W }, timestamp: new Date(x.t) })) }, null];\n",
+  "outputs": 2,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "mk-pg-db"
+   ],
+   [
+    "mk-pg-log"
+   ]
+  ],
+  "x": 1270,
+  "y": 410,
+  "z": "tab-markt",
+  "g": "grp-prognose"
+ },
+ {
+  "id": "mk-pg-db",
+  "type": "link out",
+  "name": "→ Influx markt",
+  "mode": "link",
+  "links": [
+   "sys-db-markt-in"
+  ],
+  "wires": [],
+  "x": 1500,
+  "y": 410,
+  "z": "tab-markt",
+  "g": "grp-prognose"
+ },
+ {
+  "id": "mk-pg-log",
+  "type": "link out",
+  "name": "→ Log",
+  "mode": "link",
+  "links": [
+   "log-in"
+  ],
+  "wires": [],
+  "x": 1500,
+  "y": 470,
+  "z": "tab-markt",
+  "g": "grp-prognose"
+ },
+ {
+  "id": "grp-wetter",
+  "type": "group",
+  "z": "tab-markt",
+  "name": "Wetter",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-wetter-kom",
+   "mk-we-inj",
+   "mk-we-verlauf",
+   "mk-we-q",
+   "mk-we-http",
+   "mk-we",
+   "mk-we-db"
+  ],
+  "x": 14,
+  "y": 580,
+  "w": 1180,
+  "h": 230
+ },
+ {
+  "id": "grp-wetter-kom",
+  "type": "comment",
+  "name": "Alle 10 min aktuelles Wetter, beim Start die letzten 48 h → „wetter“",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 620,
+  "z": "tab-markt",
+  "g": "grp-wetter"
+ },
+ {
+  "id": "mk-we-inj",
+  "type": "inject",
+  "name": "alle 10 min",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "600",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "5",
+  "topic": "aktuell",
+  "wires": [
+   [
+    "mk-we-q"
+   ]
+  ],
+  "x": 120,
+  "y": 680,
+  "z": "tab-markt",
+  "g": "grp-wetter"
+ },
+ {
+  "id": "mk-we-verlauf",
+  "type": "inject",
+  "name": "Verlauf 48 h (Start)",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "20",
+  "topic": "verlauf",
+  "wires": [
+   [
+    "mk-we-q"
+   ]
+  ],
+  "x": 120,
+  "y": 740,
+  "z": "tab-markt",
+  "g": "grp-wetter"
+ },
+ {
+  "id": "mk-we-q",
+  "type": "function",
+  "name": "Abfrage bauen",
+  "func": "// Wetter abfragen: Open-Meteo am Standort (ohne Anmeldung)\n// ─ Eingang: msg.topic = 'aktuell' (alle 10 min) oder 'verlauf' (beim Start: Stundenwerte der letzten 48 h)\n// ─ Ausgang 1: msg.url für den HTTP-Knoten\n// ─ Umgebung: STANDORT_LAT, STANDORT_LON, STANDORT_HOEHE (m, optional)\n\nconst lat = parseFloat(env.get('STANDORT_LAT')) || 51.16; // ohne Einstellung: Mitte Deutschlands (Warnung beim Start)\nconst lon = parseFloat(env.get('STANDORT_LON')) || 10.45;\nconst hoehe = parseFloat(env.get('STANDORT_HOEHE'));\nconst VARS = 'temperature_2m,relative_humidity_2m,apparent_temperature,dew_point_2m,precipitation,rain,snowfall,' +\n    'weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m';\nconst basis = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +\n    (isNaN(hoehe) ? '' : `&elevation=${hoehe}`) + '&timeformat=unixtime&wind_speed_unit=kmh';\nmsg.url = msg.topic === 'verlauf'\n    ? `${basis}&hourly=${VARS}&past_days=2&forecast_days=1`\n    : `${basis}&current=${VARS},is_day&forecast_days=1`;\nreturn msg;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "mk-we-http"
+   ]
+  ],
+  "x": 350,
+  "y": 680,
+  "z": "tab-markt",
+  "g": "grp-wetter"
+ },
+ {
+  "id": "mk-we-http",
+  "type": "http request",
+  "name": "Open-Meteo",
+  "method": "GET",
+  "ret": "obj",
+  "paytoqs": "ignore",
+  "url": "",
+  "tls": "",
+  "persist": false,
+  "proxy": "",
+  "insecureHTTPParser": false,
+  "authType": "",
+  "senderr": false,
+  "headers": [],
+  "wires": [
+   [
+    "mk-we"
+   ]
+  ],
+  "x": 580,
+  "y": 680,
+  "z": "tab-markt",
+  "g": "grp-wetter"
+ },
+ {
+  "id": "mk-we",
+  "type": "function",
+  "name": "Wetter auswerten",
+  "func": "// Wetter auswerten\n// ─ Eingang: Open-Meteo-Antwort mit \"current\" (aktuell) oder \"hourly\" (Verlauf 48 h)\n// ─ Ausgang 1: InfluxDB-Punkte (Bucket markt, Messreihe \"wetter\")\n// ─ Kontext: global.abbild['wetter.temperatur_C'] und weitere Felder (nur aus \"current\")\n// Felder wie im ersten Wetter-Flow: temperatur, gefuehlt, taupunkt, luftfeuchte, niederschlag, regen, schnee,\n// wettercode, bewoelkung, luftdruck, luftdruck_ort, wind, windrichtung, boeen, tag\n\nconst MAP = {\n    temperature_2m: 'temperatur', apparent_temperature: 'gefuehlt', dew_point_2m: 'taupunkt',\n    relative_humidity_2m: 'luftfeuchte', precipitation: 'niederschlag', rain: 'regen', snowfall: 'schnee',\n    weather_code: 'wettercode', cloud_cover: 'bewoelkung', pressure_msl: 'luftdruck',\n    surface_pressure: 'luftdruck_ort', wind_speed_10m: 'wind', wind_direction_10m: 'windrichtung',\n    wind_gusts_10m: 'boeen', is_day: 'tag',\n};\nconst TAGS = { ort: env.get('STANDORT_NAME') || 'Standort', quelle: 'open-meteo' };\nconst p = msg.payload || {};\nconst punkte = [];\n\nif (p.current) {\n    const c = p.current, fields = {};\n    for (const [von, nach] of Object.entries(MAP)) if (typeof c[von] === 'number') fields[nach] = c[von];\n    punkte.push({ measurement: 'wetter', tags: TAGS, fields, timestamp: new Date(c.time * 1000) });\n    const abbild = global.get('abbild') || {};\n    const zeit = Date.now();\n    abbild['wetter.temperatur_C'] = { wert: fields.temperatur, einheit: '°C', zeit, quelle: 'open-meteo' };\n    abbild['wetter.bewoelkung_pct'] = { wert: fields.bewoelkung, einheit: '%', zeit, quelle: 'open-meteo' };\n    abbild['wetter.wettercode'] = { wert: fields.wettercode, einheit: '', zeit, quelle: 'open-meteo' };\n    global.set('abbild', abbild);\n    node.status({ fill: 'green', shape: 'dot', text: `${fields.temperatur} °C, ${fields.luftfeuchte} % – ${new Date().toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin' })}` });\n} else if (p.hourly && Array.isArray(p.hourly.time)) {\n    const jetzt = Date.now() / 1000;\n    p.hourly.time.forEach((t, i) => {\n        if (t > jetzt) return; // keine Vorhersage speichern\n        const fields = {};\n        for (const [von, nach] of Object.entries(MAP)) {\n            const v = p.hourly[von] && p.hourly[von][i];\n            if (typeof v === 'number') fields[nach] = v;\n        }\n        if (Object.keys(fields).length) punkte.push({ measurement: 'wetter', tags: TAGS, fields, timestamp: new Date(t * 1000) });\n    });\n    node.status({ fill: 'blue', shape: 'dot', text: `Verlauf: ${punkte.length} Stundenwerte` });\n} else {\n    node.status({ fill: 'red', shape: 'dot', text: 'keine Wetterdaten (HTTP ' + msg.statusCode + ')' });\n    return null;\n}\nmsg.payload = punkte;\nreturn msg;\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "mk-we-db"
+   ]
+  ],
+  "x": 810,
+  "y": 680,
+  "z": "tab-markt",
+  "g": "grp-wetter"
+ },
+ {
+  "id": "mk-we-db",
+  "type": "link out",
+  "name": "→ Influx markt",
+  "mode": "link",
+  "links": [
+   "sys-db-markt-in"
+  ],
+  "wires": [],
+  "x": 1040,
+  "y": 680,
+  "z": "tab-markt",
+  "g": "grp-wetter"
+ },
+ {
+  "id": "tab-sim",
+  "type": "tab",
+  "label": "🧪 Simulator",
+  "disabled": false,
+  "info": "Bildet PV, Netz, Batterie, Wallbox mit Auto und Wärmepumpe nach, solange die echten Geräte fehlen. Je Gerät abschalten mit <GERÄT>_QUELLE = geraet (oder aus). Siehe docs/simulator.md."
+ },
+ {
+  "id": "grp-sim",
+  "type": "group",
+  "z": "tab-sim",
+  "name": "Simulator",
+  "info": "",
+  "style": {
+   "label": true,
+   "stroke": "#7d8b86",
+   "fill": "#f4f6f5",
+   "fill-opacity": "0.6"
+  },
+  "nodes": [
+   "grp-sim-kom",
+   "sim-inj",
+   "sim",
+   "sim-mw"
+  ],
+  "x": 14,
+  "y": 40,
+  "w": 720,
+  "h": 170
+ },
+ {
+  "id": "grp-sim-kom",
+  "type": "comment",
+  "name": "Alle 10 s: folgt den Befehlen des EMS wie ein echtes Gerät, Messwerte mit Quelle „simulator“",
+  "info": "",
+  "wires": [],
+  "x": 120,
+  "y": 80,
+  "z": "tab-sim",
+  "g": "grp-sim"
+ },
+ {
+  "id": "sim-inj",
+  "type": "inject",
+  "name": "alle 10 s",
+  "props": [
+   {
+    "p": "topic",
+    "vt": "str"
+   }
+  ],
+  "repeat": "10",
+  "crontab": "",
+  "once": true,
+  "onceDelay": "8",
+  "topic": "",
+  "wires": [
+   [
+    "sim"
+   ]
+  ],
+  "x": 120,
+  "y": 140,
+  "z": "tab-sim",
+  "g": "grp-sim"
+ },
+ {
+  "id": "sim",
+  "type": "function",
+  "name": "Simulator",
+  "func": "// 🧪 Simulator (alle 10 s): bildet PV, Batterie, Wallbox mit Auto und Wärmepumpe nach, solange die echten\n// Geräte fehlen. Er folgt den Befehlen des EMS genau so, wie es ein echtes Gerät tun sollte.\n// ─ Eingang: Inject alle 10 s\n// ─ Ausgang 1: Messwerte (mehrere Nachrichten) → Link „→ Messwerte“, Quelle 'simulator'\n// ─ Liest: global.befehl_batterie, global.befehl_wallbox, global.befehl_wp, global.abbild (prognose.pv, wetter.temperatur_C)\n// ─ Umgebung: <GERÄT>_QUELLE (nur Geräte mit \"simulator\" werden simuliert), PV_FLAECHEN (kWp),\n//             BATTERIE_KAPAZITAET_WH, BATTERIE_MAX_W, BATTERIE_MIN_SOC, WB_PHASEN, WB_MAX_A, WB_AKKU_KWH, SIM_ZUFALL\n// Modell (bewusst einfach, Zahlen in docs/simulator.md):\n//   PV        = Prognose der laufenden Stunde × Wolkenfaktor (Zufallsweg 0,5 … 1,05)\n//   Haus      = Grundlast 250 W + Tagesprofil + gelegentliche Spitzen (Wasserkocher, Herd)\n//   WP        = Gebäude mit 20 kWh/K Speicher und 0,15 kW/K Verlust; Heizlauf mit 1,8 kW el. (COP 3,5),\n//               Warmwasser 6:30 und 18:30 je 30 min mit 2,2 kW; SG-Ready 3 / Anhebung hebt den Raumsollwert\n//   Auto      = werktags 7:00–17:30 unterwegs (kommt mit −15 % zurück), Ladeziel im Auto 80 %\n//   Batterie  = Wirkungsgrad 95 % je Richtung, folgt dem Befehl (eigenverbrauch, laden, begrenzt)\n//   Netz      = Haus + WP + Wallbox − PV − Batterie\n\nconst jetzt = Date.now();\nconst abbild = global.get('abbild') || {};\nfunction zahl(n, std) { const v = parseFloat(env.get(n)); return isNaN(v) ? std : v; }\nconst sim = name => (env.get(name) || 'simulator') === 'simulator';\nconst stundeDez = t => {\n    const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', hour: 'numeric', minute: 'numeric',\n        hourCycle: 'h23', weekday: 'short' }).formatToParts(t).map(x => [x.type, x.value]));\n    return { h: +p.hour + +p.minute / 60, werktag: !['Sat', 'Sun'].includes(p.weekday) };\n};\nconst zufall = (env.get('SIM_ZUFALL') || 'an') !== 'aus' ? Math.random : () => 0.5;\n\nconst s = context.get('s') || {\n    zeit: jetzt, wolke: 0.9, soc: 50, raum: 21.0, wpLaeuft: false, autoSoc: 45, autoDa: true, spitzeBis: 0, spitzeW: 0,\n};\nconst dtH = Math.min(60, Math.max(1, (jetzt - s.zeit) / 1000)) / 3600; // Stunden seit dem letzten Schritt\ns.zeit = jetzt;\nconst { h, werktag } = stundeDez(jetzt);\n\n// ── PV ──\nlet pv = 0;\nconst prog = abbild['prognose.pv'];\nif (prog && Array.isArray(prog.wert)) {\n    const h0 = Math.floor(jetzt / 3600000) * 3600000;\n    const a = prog.wert.find(x => x.t === h0), b = prog.wert.find(x => x.t === h0 + 3600000);\n    if (a) pv = b ? a.W + (b.W - a.W) * ((jetzt - h0) / 3600000) : a.W;\n}\ns.wolke = Math.min(1.05, Math.max(0.5, s.wolke + (zufall() - 0.5) * 0.08));\npv = Math.max(0, Math.round(pv * s.wolke));\n\n// ── Haus (ohne WP und Wallbox) ──\nlet haus = 250 + 50 * Math.sin(h / 24 * 2 * Math.PI);\nif (h >= 6.5 && h < 8.5) haus += 400;\nif (h >= 11.5 && h < 13) haus += 500;\nif (h >= 17 && h < 22) haus += 600;\nif (jetzt > s.spitzeBis && zufall() < 0.004) { s.spitzeBis = jetzt + (60 + zufall() * 240) * 1000; s.spitzeW = 1500 + zufall() * 1500; }\nif (jetzt < s.spitzeBis) haus += s.spitzeW;\nhaus = Math.round(haus + (zufall() - 0.5) * 80);\n\n// ── Wärmepumpe ──\nconst aussenE = abbild['wetter.temperatur_C'];\nconst aussen = aussenE && typeof aussenE.wert === 'number' ? aussenE.wert : 5;\nconst bwp = global.get('befehl_wp') || {};\nconst anhebung = typeof bwp.anhebung_K === 'number' ? bwp.anhebung_K : (bwp.sgready === 3 ? 1.5 : 0);\nconst raumSoll = 21 + anhebung;\nconst ww = (h >= 6.5 && h < 7) || (h >= 18.5 && h < 19);\nlet wpW = 0, wpStatus = 'aus';\nif (sim('WP_QUELLE')) {\n    if (aussen < 15) {\n        if (!s.wpLaeuft && s.raum < raumSoll - 0.3) s.wpLaeuft = true;\n        if (s.wpLaeuft && s.raum > raumSoll + 0.3) s.wpLaeuft = false;\n    } else s.wpLaeuft = false;\n    let waerme = 0;\n    if (ww) { wpW = 2200; wpStatus = 'warmwasser'; }\n    else if (s.wpLaeuft) { wpW = 1800; wpStatus = 'heizen'; waerme = 1.8 * 3.5; }\n    s.raum += (waerme - 0.15 * (s.raum - aussen)) * dtH / 20;\n    wpW = Math.round(wpW * (0.95 + zufall() * 0.1));\n}\n\n// ── Auto und Wallbox ──\nconst bwb = global.get('befehl_wallbox') || { modus: 'frei' };\nconst phasen = zahl('WB_PHASEN', 3), maxA = zahl('WB_MAX_A', 16), akkuKWh = zahl('WB_AKKU_KWH', 60);\nlet wbW = 0, wbStatus = 'getrennt';\nif (sim('WALLBOX_QUELLE')) {\n    const unterwegs = werktag && h >= 7 && h < 17.5;\n    if (s.autoDa && unterwegs) s.autoDa = false;\n    if (!s.autoDa && !unterwegs) { s.autoDa = true; s.autoSoc = Math.max(5, s.autoSoc - 15 - zufall() * 10); }\n    if (s.autoDa) {\n        wbStatus = 'angesteckt';\n        if (bwb.modus === 'pause') wbStatus = 'pausiert';\n        else if (s.autoSoc < 80) {\n            const a = bwb.modus === 'strom' ? Math.min(maxA, bwb.ampere || 6) : maxA;\n            wbW = Math.round(a * 230 * phasen * (0.97 + zufall() * 0.03));\n            wbStatus = 'laedt';\n            s.autoSoc = Math.min(80, s.autoSoc + wbW / 1000 * dtH * 0.9 / akkuKWh * 100);\n        }\n    }\n}\n\n// ── Batterie ──\nconst cap = zahl('BATTERIE_KAPAZITAET_WH', 10000), maxW = zahl('BATTERIE_MAX_W', 5000), socMin = zahl('BATTERIE_MIN_SOC', 10);\nconst bb = global.get('befehl_batterie') || { modus: 'eigenverbrauch' };\nconst befehlAlt = !bb.zeit || jetzt - bb.zeit > 5 * 60000; // Timeout: ohne neuen Befehl zurück in den Eigenverbrauch\nconst modus = befehlAlt ? 'eigenverbrauch' : bb.modus;\nconst bedarf = haus + wpW + wbW - pv; // > 0 Defizit, < 0 Überschuss\nlet batt = 0; // > 0 Entladen, < 0 Laden\nif (sim('BATTERIE_QUELLE')) {\n    if (modus === 'laden') batt = -Math.min(maxW, bb.leistung_W || maxW);\n    else {\n        batt = Math.max(-maxW, Math.min(maxW, bedarf));\n        if (modus === 'begrenzt') {\n            if (batt > 0 && typeof bb.max_entladen_W === 'number') batt = Math.min(batt, bb.max_entladen_W);\n            if (batt < 0 && typeof bb.max_laden_W === 'number') batt = Math.max(batt, -bb.max_laden_W);\n        }\n    }\n    if (batt > 0 && s.soc <= socMin) batt = 0;\n    if (batt < 0 && s.soc >= 100) batt = 0;\n    const wh = batt > 0 ? batt * dtH / 0.95 : batt * dtH * 0.95;\n    s.soc = Math.min(100, Math.max(0, s.soc - wh / cap * 100));\n    batt = Math.round(batt);\n}\nconst netz = Math.round(haus + wpW + wbW - pv - batt);\ncontext.set('s', s);\n\nconst msgs = [];\nconst m = (geraet, quelleVar, payload) => { if (sim(quelleVar)) msgs.push({ geraet, quelle: 'simulator', payload, zeit: jetzt }); };\nm('pv', 'PV_QUELLE', { leistung_W: pv });\nm('batterie', 'BATTERIE_QUELLE', { soc_pct: +s.soc.toFixed(1), leistung_W: batt, modus });\nm('wallbox', 'WALLBOX_QUELLE', { leistung_W: wbW, status: wbStatus, ampere: wbW ? Math.round(wbW / 230 / phasen) : 0 });\nm('auto', 'AUTO_QUELLE', { soc_pct: +s.autoSoc.toFixed(1) });\nm('wp', 'WP_QUELLE', { leistung_W: wpW, status: wpStatus, raum_C: +s.raum.toFixed(2), aussen_C: aussen });\nm('netz', 'NETZ_QUELLE', { bezug_W: netz }); // zuletzt, damit die Hausbilanz alle Werte dieses Schritts sieht\nnode.status({ fill: 'blue', shape: 'dot',\n    text: `PV ${pv} · Haus ${haus} · WP ${wpW} · Auto ${wbW} (${Math.round(s.autoSoc)} %) · Akku ${batt} (${s.soc.toFixed(0)} %) · Netz ${netz} W` });\nreturn [msgs];\n",
+  "outputs": 1,
+  "timeout": 0,
+  "noerr": 0,
+  "initialize": "",
+  "finalize": "",
+  "libs": [],
+  "wires": [
+   [
+    "sim-mw"
+   ]
+  ],
+  "x": 350,
+  "y": 140,
+  "z": "tab-sim",
+  "g": "grp-sim"
+ },
+ {
+  "id": "sim-mw",
+  "type": "link out",
+  "name": "→ Messwerte",
+  "mode": "link",
+  "links": [
+   "sys-mw-in"
+  ],
+  "wires": [],
+  "x": 580,
+  "y": 140,
+  "z": "tab-sim",
+  "g": "grp-sim"
+ },
+ {
+  "id": "influx-radler",
+  "type": "influxdb",
+  "hostname": "127.0.0.1",
+  "port": "8086",
+  "protocol": "http",
+  "database": "database",
+  "name": "InfluxDB Radler-EMS",
+  "usetls": false,
+  "tls": "",
+  "influxdbVersion": "2.0",
+  "url": "http://localhost:8086",
+  "timeout": "10",
+  "rejectUnauthorized": true
+ }
+]

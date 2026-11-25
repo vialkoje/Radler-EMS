@@ -1,0 +1,1010 @@
+{
+  "uid": "radler-wetter",
+  "title": "Radler-EMS: Wetter",
+  "description": "Wetter am Standort (Open-Meteo), Bucket markt.",
+  "tags": [
+    "radler-ems",
+    "wetter"
+  ],
+  "timezone": "browser",
+  "refresh": "5m",
+  "time": {
+    "from": "now-48h",
+    "to": "now"
+  },
+  "schemaVersion": 39,
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Temperatur",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "radler-influx"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "radler-influx"
+          },
+          "query": "from(bucket: \"markt\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"wetter\" and r._field == \"temperatur\")\n  |> group()\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Temperatur\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "celsius",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              },
+              {
+                "color": "blue",
+                "value": -10
+              },
+              {
+                "color": "light-blue",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 10
+              },
+              {
+                "color": "orange",
+                "value": 20
+              },
+              {
+                "color": "red",
+                "value": 30
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Gefühlt",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "radler-influx"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "radler-influx"
+          },
+          "query": "from(bucket: \"markt\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"wetter\" and r._field == \"gefuehlt\")\n  |> group()\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Gefühlt\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "celsius",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              },
+              {
+                "color": "blue",
+                "value": -10
+              },
+              {
+                "color": "light-blue",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 10
+              },
+              {
+                "color": "orange",
+                "value": 20
+              },
+              {
+                "color": "red",
+                "value": 30
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Wetterlage",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "radler-influx"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "radler-influx"
+          },
+          "query": "from(bucket: \"markt\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"wetter\" and r._field == \"wettercode\")\n  |> group()\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Wetterlage\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Klar",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Überwiegend klar",
+                  "index": 1
+                },
+                "2": {
+                  "text": "Teilweise bewölkt",
+                  "index": 2
+                },
+                "3": {
+                  "text": "Bedeckt",
+                  "index": 3
+                },
+                "45": {
+                  "text": "Nebel",
+                  "index": 4
+                },
+                "48": {
+                  "text": "Reifnebel",
+                  "index": 5
+                },
+                "51": {
+                  "text": "Leichter Niesel",
+                  "index": 6
+                },
+                "53": {
+                  "text": "Niesel",
+                  "index": 7
+                },
+                "55": {
+                  "text": "Starker Niesel",
+                  "index": 8
+                },
+                "56": {
+                  "text": "Gefrierender Niesel",
+                  "index": 9
+                },
+                "57": {
+                  "text": "Gefrierender Niesel",
+                  "index": 10
+                },
+                "61": {
+                  "text": "Leichter Regen",
+                  "index": 11
+                },
+                "63": {
+                  "text": "Regen",
+                  "index": 12
+                },
+                "65": {
+                  "text": "Starker Regen",
+                  "index": 13
+                },
+                "66": {
+                  "text": "Gefrierender Regen",
+                  "index": 14
+                },
+                "67": {
+                  "text": "Gefrierender Regen",
+                  "index": 15
+                },
+                "71": {
+                  "text": "Leichter Schneefall",
+                  "index": 16
+                },
+                "73": {
+                  "text": "Schneefall",
+                  "index": 17
+                },
+                "75": {
+                  "text": "Starker Schneefall",
+                  "index": 18
+                },
+                "77": {
+                  "text": "Schneegriesel",
+                  "index": 19
+                },
+                "80": {
+                  "text": "Leichte Regenschauer",
+                  "index": 20
+                },
+                "81": {
+                  "text": "Regenschauer",
+                  "index": 21
+                },
+                "82": {
+                  "text": "Heftige Regenschauer",
+                  "index": 22
+                },
+                "85": {
+                  "text": "Schneeschauer",
+                  "index": 23
+                },
+                "86": {
+                  "text": "Starke Schneeschauer",
+                  "index": 24
+                },
+                "95": {
+                  "text": "Gewitter",
+                  "index": 25
+                },
+                "96": {
+                  "text": "Gewitter mit Hagel",
+                  "index": 26
+                },
+                "99": {
+                  "text": "Gewitter mit Hagel",
+                  "index": 27
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Luftfeuchte",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "radler-influx"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "radler-influx"
+          },
+          "query": "from(bucket: \"markt\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"wetter\" and r._field == \"luftfeuchte\")\n  |> group()\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Luftfeuchte\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "percent",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 30
+              },
+              {
+                "color": "blue",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Luftdruck (NN)",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "radler-influx"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "radler-influx"
+          },
+          "query": "from(bucket: \"markt\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"wetter\" and r._field == \"luftdruck\")\n  |> group()\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Luftdruck (NN)\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "pressurehpa",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Windrichtung",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "radler-influx"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "radler-influx"
+          },
+          "query": "from(bucket: \"markt\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"wetter\" and r._field == \"windrichtung\")\n  |> group()\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Windrichtung\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "range",
+              "options": {
+                "from": -22.5,
+                "to": 22.5,
+                "result": {
+                  "text": "N",
+                  "index": 0
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 22.5,
+                "to": 67.5,
+                "result": {
+                  "text": "NO",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 67.5,
+                "to": 112.5,
+                "result": {
+                  "text": "O",
+                  "index": 2
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 112.5,
+                "to": 157.5,
+                "result": {
+                  "text": "SO",
+                  "index": 3
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 157.5,
+                "to": 202.5,
+                "result": {
+                  "text": "S",
+                  "index": 4
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 202.5,
+                "to": 247.5,
+                "result": {
+                  "text": "SW",
+                  "index": 5
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 247.5,
+                "to": 292.5,
+                "result": {
+                  "text": "W",
+                  "index": 6
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 292.5,
+                "to": 337.5,
+                "result": {
+                  "text": "NW",
+                  "index": 7
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 337.5,
+                "to": 382.5,
+                "result": {
+                  "text": "N",
+                  "index": 8
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Temperatur",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "radler-influx"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "radler-influx"
+          },
+          "query": "from(bucket: \"markt\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"wetter\" and (r._field == \"temperatur\" or r._field == \"gefuehlt\" or r._field == \"taupunkt\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"temperatur\", \"gefuehlt\", \"taupunkt\"])\n  |> rename(columns: {temperatur: \"Temperatur\", gefuehlt: \"Gefühlt\", taupunkt: \"Taupunkt\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "celsius",
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": 3600000,
+            "lineInterpolation": "smooth"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Temperatur"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Gefühlt"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Taupunkt"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Luftfeuchte & Bewölkung",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "radler-influx"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "radler-influx"
+          },
+          "query": "from(bucket: \"markt\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"wetter\" and (r._field == \"luftfeuchte\" or r._field == \"bewoelkung\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"luftfeuchte\", \"bewoelkung\"])\n  |> rename(columns: {luftfeuchte: \"Luftfeuchte\", bewoelkung: \"Bewölkung\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "percent",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": 3600000,
+            "lineInterpolation": "linear"
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Luftdruck (auf Meereshöhe)",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "radler-influx"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "radler-influx"
+          },
+          "query": "from(bucket: \"markt\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"wetter\" and (r._field == \"luftdruck\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"luftdruck\"])\n  |> rename(columns: {luftdruck: \"Luftdruck\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "pressurehpa",
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": 3600000,
+            "lineInterpolation": "linear"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Wind & Böen",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "radler-influx"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "radler-influx"
+          },
+          "query": "from(bucket: \"markt\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"wetter\" and (r._field == \"wind\" or r._field == \"boeen\"))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"wind\", \"boeen\"])\n  |> rename(columns: {wind: \"Wind\", boeen: \"Böen\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "velocitykmh",
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": 3600000,
+            "lineInterpolation": "linear"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Niederschlag pro Stunde",
+      "description": "",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "radler-influx"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "radler-influx"
+          },
+          "query": "from(bucket: \"markt\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"wetter\" and (r._field == \"regen\" or r._field == \"schnee\"))\n  |> aggregateWindow(every: 1h, fn: max, createEmpty: false)\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"_time\", \"regen\", \"schnee\"])\n  |> rename(columns: {regen: \"Regen\", schnee: \"Schnee (cm)\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "lengthmm",
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Regen"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Schnee (cm)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "light-blue"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "lengthcm"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+secrets.env
+*.env
+!deploy/secrets.env.example
+flows_cred.json
+.config.*.json
+backup/
+log/
+__pycache__/
+.venv/
+.DS_Store

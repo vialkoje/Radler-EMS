@@ -75,24 +75,8 @@ echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stab
 sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get -y install grafana
 
-sudo tee /etc/grafana/provisioning/datasources/influxdb.yaml >/dev/null <<EOF
-apiVersion: 1
-datasources:
-  - name: InfluxDB
-    uid: influxdb-home
-    type: influxdb
-    access: proxy
-    url: http://localhost:8086
-    isDefault: true
-    jsonData:
-      version: Flux
-      organization: $ORG
-      defaultBucket: $BUCKET
-    secureJsonData:
-      token: $INFLUX_TOKEN
-EOF
-sudo chown root:grafana /etc/grafana/provisioning/datasources/influxdb.yaml
-sudo chmod 640 /etc/grafana/provisioning/datasources/influxdb.yaml
+# Keine Datenquelle mit dem Admin-Token: Grafana bekommt die Datenquelle „Radler-EMS“ mit einem nur-lesenden
+# Token später über tools/grafana_einspielen.py (nach deploy/influx_einrichten.sh).
 
 sudo systemctl daemon-reload
 sudo systemctl enable grafana-server
@@ -142,12 +126,12 @@ InfluxDB 2      http://$IP:8086
   Passwort:     $INFLUX_PW
   Organisation: $ORG
   Bucket:       $BUCKET
-  API-Token:    $INFLUX_TOKEN
+  Admin-Token:  $INFLUX_TOKEN  (darf alles: nicht in Grafana oder Node-RED eintragen)
 
 Grafana         http://$IP:3000
   Benutzer:     admin
   Passwort:     $GRAFANA_PW
-  Datenquelle "InfluxDB" (Flux) ist bereits eingerichtet.
+  Datenquelle: folgt mit tools/grafana_einspielen.py (nur-lesender Token).
 
 Node-RED        http://$IP:1880
   Benutzer:     admin

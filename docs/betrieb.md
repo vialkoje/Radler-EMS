@@ -46,6 +46,27 @@ python3 tools/grafana_einspielen.py
 `~/radler-ems/secrets.env` bearbeiten, dann `sudo systemctl restart nodered`. Die Startmeldung im Log nennt die aktiven
 Modi und Quellen. Alle Variablen: [Einstellungen](einstellungen.md).
 
+## Zugangsdaten: wo sie liegen und wer sie lesen kann
+
+Adressen, Benutzer, Passwörter und Tokens der Geräte stehen **nur** in `~/radler-ems/secrets.env`:
+
+| Ort | Inhalt | Schutz |
+|---|---|---|
+| `~/radler-ems/secrets.env` | Geräte (`…_HOST`, `…_USER`, `…_PASSWORD`), InfluxDB-Tokens, Einstellungen | nicht im Repository (`.gitignore`), `chmod 600` (nur pi) |
+| Repository, `nodered/flows.json` | nur **Namen** wie `env.get('WP_PASSWORD')` oder `${WALLBOX_HOST}` | keine Werte |
+| `~/.node-red/flows_cred.json` | InfluxDB-Token des Konfigurationsknotens (beim Einspielen eingesetzt) | verschlüsselt mit `credentialSecret` aus `settings.js`, beide `chmod 600` |
+| `~/.smarthome-secrets`, `~/zugangsdaten-smarthome.txt` | Admin-Passwörter von Node-RED, Grafana, InfluxDB | `chmod 600` |
+
+**Was das nicht verhindert:** Node-RED braucht die Werte zur Laufzeit. Jeder Funktionsknoten kann sie mit
+`env.get()` lesen, und wer sich im Node-RED-Editor anmeldet, könnte einen Knoten bauen, der sie ausgibt. Der Editor
+ist deshalb mit Passwort geschützt; wer ihn bedienen darf, darf auch die Geräte steuern. Die HTTP-Endpunkte (`/radler/…`)
+und Grafana geben keine Zugangsdaten heraus. Regeln für den Code:
+
+- Zugangsdaten nie in `node.status`, `node.warn`, das Log oder die InfluxDB schreiben, nie in Kommentare.
+- In Knoteneigenschaften nur `${NAME}` eintragen (HTTP-URL, Modbus-Host); Node-RED setzt den Wert beim Start ein,
+  im Export steht weiter `${NAME}`.
+- Wer `secrets.env` weitergibt (z. B. bei der Übergabe), gibt alle Zugänge weiter. Nach der Übergabe Passwörter ändern.
+
 ## Woran man sieht, dass alles läuft
 
 - Grafana „Radler-EMS: Entscheidungen“: oben drei Zeilen (Batterie, Wallbox, Wärmepumpe) laufen mit.

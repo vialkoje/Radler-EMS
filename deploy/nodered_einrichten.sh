@@ -23,4 +23,7 @@ ln -sfn "$SECRETS" "$HOME/.node-red/environment"
 echo "~/.node-red/environment → $SECRETS"
 
 mkdir -p "$HOME/radler-ems/log" "$HOME/radler-ems/backup"
+# Nur pi darf Zugangsdaten lesen: settings.js enthält den Schlüssel für flows_cred.json
+chmod 700 "$HOME/radler-ems/log" "$HOME/radler-ems/backup"
+chmod 600 "$SECRETS" "$SETTINGS"; [ -f "$HOME/.node-red/flows_cred.json" ] && chmod 600 "$HOME/.node-red/flows_cred.json"
 echo "Fertig. Node-RED neu starten, damit Einstellungen und Logger gelten: sudo systemctl restart nodered"

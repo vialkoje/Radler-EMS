@@ -7,7 +7,7 @@
 // ─ Ausgang 3: msg.log bei geänderter Anhebung
 // ─ Liest: global.abbild (wp.status, wp.leistung_W, wp.aussen_C oder wetter.temperatur_C, wp.raum_C),
 //          global.ems_live, global.ems_plan
-// ─ Umgebung: WP_MODUS, WP_HEIZGRENZE_C, ANHEBUNG_PV_K, ANHEBUNG_GUENSTIG_K, WP_GUENSTIG_ANTEIL, PV_START_W, PV_HALTEN_W,
+// ─ Umgebung: WW_GUENSTIG (aus | beobachten | aktiv), WW_GUENSTIG_ANTEIL, WP_MODUS, WP_HEIZGRENZE_C, ANHEBUNG_PV_K, ANHEBUNG_GUENSTIG_K, WP_GUENSTIG_ANTEIL, PV_START_W, PV_HALTEN_W,
 //             PV_AUS_MIN, PV_AKKU_SOC, WP_PV_PROGNOSE_WH, RAUM_MAX_C, NACHHEIZ_K, NACHHEIZ_MIN, WW_NACHT_VON, WW_NACHT_BIS
 //
 // SG-Ready: 1 = Sperre (nicht genutzt), 2 = Normalbetrieb, 3 = Einschaltempfehlung (mehr heizen), 4 = Anlaufbefehl (nicht genutzt)
@@ -99,7 +99,27 @@ if (geaendert) st.geaendert = jetzt;
 // damit die Wärme in den Estrich geht und das Warmwasser keinen Heizlauf unterbricht
 const h = stunde(jetzt);
 const nachtVon = zahl('WW_NACHT_VON', 1), nachtBis = zahl('WW_NACHT_BIS', 5);
-const wwAbsenken = modus !== 'aus' && ((h >= nachtVon && h < nachtBis) || anhebung >= 1 || heizt);
+const istNacht = x => nachtVon <= nachtBis ? x >= nachtVon && x < nachtBis : x >= nachtVon || x < nachtBis;
+
+// Warmwasser in günstigen Stunden (aus Haus-EMS flows-34): normaler Sollwert nur in den billigsten WW_GUENSTIG_ANTEIL
+// der bekannten Stunden außerhalb der Nacht und im PV-Fenster, sonst abgesenkt. Die Wärmepumpe heizt das Warmwasser dann
+// fast nur noch in diesen Stunden nach. In Haus-EMS liefen 42 von 52 kWh Warmwasser außerhalb dieser Stunden (Ø 45,4 statt
+// 39,8 ct, 29.10.–28.11.2026). Ohne Preise (null) gilt die bisherige Regel. Im Fenster hat Warmwasser Vorrang vor der
+// Absenkung wegen einer Anhebung: beides ist dann billig.
+const wwModus = text('WW_GUENSTIG', 'beobachten');
+let wwFenster = null;
+if (plan && jetzt - plan.zeit < 20 * 60000 && plan.preise && plan.preise.length) {
+    const h0 = Math.floor(jetzt / 3600000) * 3600000;
+    const liste = plan.preise.filter(p => p.t >= h0);
+    if (liste.length && liste[0].t === h0) {
+        const tagsueber = liste.filter(p => !istNacht(stunde(p.t))).map(p => p.ct).sort((a, b) => a - b);
+        const grenze = tagsueber[Math.min(tagsueber.length - 1, Math.floor(tagsueber.length * zahl('WW_GUENSTIG_ANTEIL', 0.33)))];
+        wwFenster = !istNacht(h) && tagsueber.length > 0 && liste[0].ct <= grenze;
+    }
+}
+if (st.pvFenster) wwFenster = true;
+const wwRegel = wwModus === 'aktiv' && wwFenster !== null;
+const wwAbsenken = modus !== 'aus' && (istNacht(h) || heizt || (wwRegel ? !wwFenster : anhebung >= 1));
 
 const befehl = { sgready: anhebung > 0 ? 3 : 2, anhebung_K: anhebung, ww_absenken: wwAbsenken };
 const senden = modus === 'aktiv' && (geaendert || JSON.stringify(befehl) !== JSON.stringify(st.befehl) || jetzt - (st.gesendet || 0) >= 15 * 60000);
@@ -112,13 +132,16 @@ context.set('st', st);
 
 const fields = { anhebung_K: anhebung, ziel_K: ziel, sgready: befehl.sgready, grund, heizzeit: heizzeit ? 1 : 0,
     pv_fenster: st.pvFenster ? 1 : 0, guenstig: guenstig ? 1 : 0, heizen: heizt ? 1 : 0, ww_absenken: wwAbsenken ? 1 : 0,
+    ww_fenster: wwFenster === null ? -1 : wwFenster ? 1 : 0, ww_guenstig: wwModus,
     gesendet: senden ? 1 : 0 };
 if (ue !== null) fields.ueberschuss_W = Math.round(ue);
 if (raum !== null) fields.raum_C = raum;
 if (aussen24 !== null) fields.aussen24_C = +aussen24.toFixed(1);
 
 node.status({ fill: anhebung > 0 ? 'blue' : 'green', shape: senden ? 'dot' : 'ring',
-    text: `+${anhebung} K (SG ${befehl.sgready}) – ${grund}` + (modus !== 'aktiv' ? ` · ${modus}` : '') });
+    text: `+${anhebung} K (SG ${befehl.sgready}) – ${grund} · WW ${wwAbsenken ? 'abgesenkt' : 'normal'}` +
+          (wwFenster === null ? '' : wwFenster ? ' (günstig)' : ' (teuer)') + (wwModus !== 'aktiv' ? ` [WW ${wwModus}]` : '') +
+          (modus !== 'aktiv' ? ` · ${modus}` : '') });
 return [senden ? { befehl: Object.assign({ grund, zeit: jetzt }, befehl) } : null,
         { payload: [{ measurement: 'wp_steuerung', tags: { quelle: 'ems' }, fields, timestamp: new Date(jetzt) }] },
         logs.length ? logs : null];

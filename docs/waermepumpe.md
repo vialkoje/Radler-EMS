@@ -58,9 +58,42 @@ nachts +2 K aus dem Akku.
 hoch und runter, Läufe brachen ab. Als Fenster bleibt sie oben, solange die Energie billig ist, und endet nie mitten
 in einem Lauf (sonst läge der Rücklauf schlagartig über dem neuen Soll und der Lauf bräche ab).
 
-**Warmwasser absenken** (`ww_absenken`): nachts von `WW_NACHT_VON` bis `WW_NACHT_BIS` (1–5 Uhr), während einer
-Anhebung ab 1 K (die Wärme soll in den Estrich) und während eines Heizlaufs (sonst unterbricht die WP den Heizlauf für
-Warmwasser). Nur wirksam, wenn der Adapter einen Warmwasser-Sollwert schreiben kann.
+## Warmwasser
+
+Der Befehl enthält `ww_absenken`. Der Adapter senkt dann den Warmwasser-Sollwert (z. B. 50 → 45 °C), wenn die
+Wärmepumpe einen schreibbaren Sollwert hat; die Wärmepumpe heizt Warmwasser meist erst nach, wenn es etwa 5 K unter dem
+Sollwert liegt. Abgesenkt wird
+
+| wann | warum |
+|---|---|
+| nachts von `WW_NACHT_VON` bis `WW_NACHT_BIS` (1–5 Uhr) | Ruhe, Wärme in den Estrich |
+| während eines Heizlaufs | sonst unterbricht die WP den Heizlauf für Warmwasser (Haus-EMS: alle Starts 4,2–5,0 K unter dem Soll) |
+| mit `WW_GUENSTIG` = `aktiv`: außerhalb der günstigen Warmwasser-Stunden und des PV-Fensters | Warmwasser in billigen Stunden nachheizen |
+| sonst (`beobachten`, `aus` oder ohne Preise): während einer Anhebung ab 1 K | die Wärme soll in den Estrich |
+
+```mermaid
+flowchart TD
+    L(["jede Minute"]) --> N{"1–5 Uhr oder<br/>Heizlauf?"}
+    N -->|"ja"| AB["ww_absenken"]
+    N -->|"nein"| M{"WW_GUENSTIG = aktiv<br/>und Preise da?"}
+    M -->|"ja"| F{"günstige Stunde<br/>oder PV-Fenster?"}
+    F -->|"ja"| NO["normal"]
+    F -->|"nein"| AB
+    M -->|"nein"| A{"Anhebung ≥ 1 K?"}
+    A -->|"ja"| AB
+    A -->|"nein"| NO
+```
+
+**Warmwasser in günstigen Stunden** (`WW_GUENSTIG`, aus Haus-EMS flows-34): Günstig sind die billigsten
+`WW_GUENSTIG_ANTEIL` (33 %) der bekannten Stunden **außerhalb der Nacht** (sonst fiele das Fenster immer in die
+Nachtabsenkung) und das PV-Fenster. Im Fenster gilt der normale Sollwert auch während einer Anhebung: beides ist dann
+billig, der Heizlauf hängt sich über `NACHHEIZ_K` an. In Haus-EMS liefen vorher 42 von 52 kWh Warmwasser in einem Monat
+außerhalb dieser Stunden (Ø 45,4 statt 39,8 ct); nachgerechnet bringt die Regel dort etwa 15 € je Heizsaison. Nebenwirkung:
+Nach dem Duschen am Morgen kann das Wasser bis etwa 40 °C fallen, bevor es im nächsten günstigen Fenster (oft mittags)
+wieder aufgeheizt wird.
+
+`beobachten` (Standard) protokolliert nur `ww_fenster`; nach einigen Tagen mit echter Wärmepumpe auf `aktiv` stellen.
+Im Simulator lässt sich die Wirkung direkt sehen: Grafana „Entscheidungen“, Panel Wärmepumpe, Kurve „Warmwasser“.
 
 ## Neustart und Ausfall
 
@@ -71,4 +104,5 @@ Relais ein Relais mit Rückfall (z. B. Shelly mit „Auto off“ nach 20 min, al
 ## Protokoll `wp_steuerung`
 
 `anhebung_K`, `ziel_K`, `sgready`, `grund`, `heizzeit`, `pv_fenster`, `guenstig`, `heizen`, `ww_absenken`,
-`ueberschuss_W`, `raum_C`, `aussen24_C`, `gesendet`.
+`ww_fenster` (1 günstige Warmwasser-Stunde, 0 nicht, −1 ohne Preise), `ww_guenstig` (Modus), `ueberschuss_W`, `raum_C`,
+`aussen24_C`, `gesendet`.

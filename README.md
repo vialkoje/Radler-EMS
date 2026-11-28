@@ -3,8 +3,8 @@
 Energiemanagement für ein Haus mit **PV-Anlage mit Wechselrichter, PV-Batterie, Wallbox fürs E-Auto und
 Wärmepumpe**, optional einem **Balkonkraftwerk**, auf einem Raspberry Pi mit **Node-RED, InfluxDB 2 und Grafana**.
 
-Abgeleitet aus dem Haus-EMS (zwei Hausakkus, Balkonkraftwerk, Waterkotte, Etrel), vereinfacht auf vier Geräte
-und **geräteunabhängig**: Jedes Gerät hängt über einen Adapter an einer festen Schnittstelle. Solange die echten
+Abgeleitet aus dem Haus-EMS (zwei Hausakkus, Balkonkraftwerk, Waterkotte, Etrel; Regeln auf dem Stand von dessen
+flows-34), vereinfacht auf vier Geräte und ein optionales Balkonkraftwerk und **geräteunabhängig**: Jedes Gerät hängt über einen Adapter an einer festen Schnittstelle. Solange die echten
 Geräte fehlen, bildet ein **Simulator** sie nach. Das ganze EMS läuft also sofort und lässt sich ausprobieren.
 Beim Hackathon tauscht man nur noch Adapter gegen echte Geräte.
 
@@ -37,6 +37,7 @@ flowchart LR
 | **Auto lädt aus dem Netz, nicht aus dem Akku** | Beim Autoladen entlädt der Akku nicht ins Auto; bei teurem Strom oder PV-Laden deckt er nur das Haus | [EMS](docs/ems.md#ausführung-alle-10-s) |
 | **Ladeplanung Auto** | bis 25 % sofort, 50 % sicher zur Abfahrt, bis 80 % in günstigen Stunden, darüber frei; PV-Laden mit dem Überschuss nach dem Hausakku | [Wallbox](docs/wallbox.md) |
 | **Wärmepumpe** | SG-Ready 3 bzw. +2 K bei PV-Überschuss oder in den billigsten Stunden, nie mitten im Heizlauf zurück | [Wärmepumpe](docs/waermepumpe.md) |
+| **Warmwasser** | nur in den günstigsten Stunden und bei PV-Überschuss nachheizen, nachts und im Heizlauf abgesenkt (`WW_GUENSTIG`) | [Wärmepumpe](docs/waermepumpe.md#warmwasser) |
 | **Log und Meldungen** | ein Log je Tag, Fehler/Warnungen in InfluxDB, Push über ntfy mit Sperrzeit und Nachtruhe, Tagesbericht um 7 Uhr | [Architektur](docs/architektur.md#log-und-meldungen) |
 
 Ziele in dieser Rangfolge (aus Haus-EMS übernommen): **1. feste Zusagen** (Auto 25/50 %, Heizlauf nicht
@@ -74,6 +75,7 @@ Danach: Node-RED `http://<pi>:1880`, Grafana `http://<pi>:3000` (Ordner „Radle
 | [InfluxDB und Grafana](docs/influxdb-grafana.md) | Buckets, Messreihen, Tokens, Dashboards |
 | [Betrieb](docs/betrieb.md) | Installation, Einspielen, Sicherung, Updates, Übergabe des Pi |
 | [Hackathon](docs/hackathon.md) | Ablauf, Aufgaben, Ideen |
+| [Änderungsverlauf](docs/aenderungen.md) | was sich wann geändert hat und was aus Haus-EMS übernommen ist |
 
 ## Im Repository
 

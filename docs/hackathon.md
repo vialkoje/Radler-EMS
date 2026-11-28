@@ -38,6 +38,8 @@ Regel für den Tag: **erst lesen, dann beobachten, dann schreiben.** Kein Gerät
 - Netzladen mit 15-Minuten-Preisen statt Stundenmitteln (`markt.preise_15` ist schon im Abbild).
 - Wallbox: Umschalten 1/3 Phasen, damit PV-Laden schon ab 1,4 kW geht.
 - Wärmepumpe: SG-Ready 1 (Sperre) in den teuersten Stunden, wenn das Haus warm genug ist.
+- Warmwasser in günstigen Stunden (`WW_GUENSTIG`) mit der echten Wärmepumpe prüfen: Folgt sie dem abgesenkten Sollwert,
+  wie tief fällt das Wasser morgens, wie viele Starts spart es?
 - Zusage „Akku-Grenze“: Was soll gemeldet werden?
 
 **Auswerten**

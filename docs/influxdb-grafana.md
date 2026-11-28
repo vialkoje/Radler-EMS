@@ -22,7 +22,7 @@ Verlauf nicht mehr gebraucht wird.
 | geraete | `batterie` | `soc_pct`, `leistung_W` (> 0 Entladen), beim Simulator `modus` | `quelle` |
 | geraete | `wallbox` | `leistung_W`, `status`, `ampere` | `quelle` |
 | geraete | `auto` | `soc_pct` | `quelle` (simulator, geraet, manuell) |
-| geraete | `wp` | `leistung_W`, `status`, `raum_C`, `aussen_C` | `quelle` |
+| geraete | `wp` | `leistung_W`, `status`, `raum_C`, `aussen_C`, `ww_C` | `quelle` |
 | geraete | `haus` | `verbrauch_W`, `ohne_auto_W`, `grundlast_W` | `quelle=bilanz` |
 | ems | `ems_strategie` | siehe [EMS](ems.md#protokoll-ems_strategie) | |
 | ems | `ems_ausfuehrung` | siehe [EMS](ems.md#ausführung-alle-10-s) | |

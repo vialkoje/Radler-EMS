@@ -38,7 +38,7 @@ Ausgang des Adapters → Link „→ Messwerte“:
 | `batterie` | `soc_pct`, `leistung_W` | **> 0 Entladen, < 0 Laden** | 10 s |
 | `wallbox` | `leistung_W`, `status`, `ampere` | status: `getrennt`, `angesteckt`, `laedt`, `pausiert`, `stoerung` | 10–60 s |
 | `auto` | `soc_pct` | 0–100 | 5–15 min |
-| `wp` | `leistung_W`, `status`, optional `aussen_C`, `raum_C` | status: `aus`, `heizen`, `warmwasser`, `stoerung` | 60 s |
+| `wp` | `leistung_W`, `status`, optional `aussen_C`, `raum_C`, `ww_C` (Warmwasser) | status: `aus`, `heizen`, `warmwasser`, `stoerung` | 60 s |
 
 Zusätzliche Felder sind erlaubt (landen in der InfluxDB), z. B. `tagesertrag_kWh`, `temperatur_C`.
 
@@ -110,5 +110,15 @@ Im Editor „Palette verwalten“, oder auf dem Pi in `~/.node-red`: `npm instal
 | `node-red-contrib-ocpp` | Wallboxen mit OCPP (Node-RED als Zentrale) |
 | eingebaut: `http request`, `mqtt in/out` | HTTP/JSON-Geräte, Shelly, Tasmota, evcc, Zigbee2MQTT |
 
-Erfahrung aus Haus-EMS: **nur eine Modbus-Verbindung je Gerät** (sonst Lesefehler), Register einzeln und in fester
-Reihenfolge schreiben, Vorzeichen am Gerät prüfen.
+## Lehren aus Haus-EMS (Fehler, die dort im Betrieb aufgetreten sind)
+
+| Regel für den Adapter | Was in Haus-EMS passiert ist |
+|---|---|
+| **Eine Modbus-Verbindung je Gerät** für alle Lese- und Schreibknoten | zwei Verbindungen zum selben Gerät → Lesefehler |
+| **Modbus-Timeout ≥ 3 s** am Client-Knoten (Standard 1 s ist zu knapp, wenn viele Abfragen an einer Verbindung hängen) | Wallbox: nach einer langsamen Antwort galt die Verbindung kurz als gestört, 69 Lese- und 18 Schreibfehler in 17 Tagen (behoben mit 3 s, flows-33) |
+| Register **einzeln und in fester Reihenfolge** schreiben | ein Block über mehrere Register setzte beim Solakon die Leistung auf 0 |
+| **Leistung in jedem Zustand lesen**, nicht nur im Zustand „lädt“ | die Wallbox meldete eine Stunde „pausiert“, während das Auto mit 10 kW lud; die Leistung fehlte, der Zusage-Wächter schlug Alarm (flows-28) |
+| **Antwort prüfen**, bevor man sie auswertet: kein JSON (z. B. eine HTML-Wartungsseite) → verwerfen, ohne Fehler | die sonnen lieferte jede Nacht beim Neustart eine HTML-Seite; der JSON-Knoten meldete jede Nacht zwei Fehler (flows-33). Die Funktionsknoten von Radler-EMS prüfen das schon (Test „HTML-Seite statt JSON“) |
+| **Change-Knoten nur auf Objekte schreiben** (`msg.topic` ist meist Text) | „reset counter“ setzte `msg.topic.reset`, brach ab und verwarf die Nachricht; der Abrufzähler der PV-Prognose wurde nie zurückgesetzt, nach zwei Tagen kamen keine Prognosen mehr (flows-33) |
+| **Vorzeichen am Gerät prüfen** und im Adapter auf die Konvention oben umrechnen | mehrere Geräte zählen Einspeisung bzw. Entladung positiv |
+| **Einheiten prüfen** (W oder kW) | die Wallbox speichert kW; Tagesbericht und EMS rechneten sie anfangs als W (1000-mal zu klein) |

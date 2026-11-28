@@ -10,7 +10,10 @@
 //   BKW       = Prognose des Balkonkraftwerks × Wolkenfaktor, höchstens BKW_MAX_W (nur mit BKW_QUELLE = simulator)
 //   Haus      = Grundlast 250 W + Tagesprofil + gelegentliche Spitzen (Wasserkocher, Herd)
 //   WP        = Gebäude mit 20 kWh/K Speicher und 0,15 kW/K Verlust; Heizlauf mit 1,8 kW el. (COP 3,5),
-//               Warmwasser 6:30 und 18:30 je 30 min mit 2,2 kW; SG-Ready 3 / Anhebung hebt den Raumsollwert
+//               SG-Ready 3 / Anhebung hebt den Raumsollwert. Warmwasserspeicher 300 l: Zapfen morgens 6:30–7:30 und
+//               abends 18:30–19:30, 0,5 K/h Verlust; nachgeheizt mit 2,2 kW (COP 2,5), wenn er 5 K unter dem Sollwert
+//               liegt (50 °C, mit ww_absenken 45 °C); dafür unterbricht sie einen Heizlauf wie eine echte Wärmepumpe
+//               (deshalb senkt die Steuerung während eines Heizlaufs ab: dann erst unter 40 °C)
 //   Auto      = werktags 7:00–17:30 unterwegs (kommt mit −15 % zurück), Ladeziel im Auto 80 %
 //   Batterie  = Wirkungsgrad 95 % je Richtung, folgt dem Befehl (eigenverbrauch, laden, begrenzt)
 //   Netz      = Haus + WP + Wallbox − PV − Balkonkraftwerk − Batterie
@@ -61,7 +64,13 @@ const aussen = aussenE && typeof aussenE.wert === 'number' ? aussenE.wert : 5;
 const bwp = global.get('befehl_wp') || {};
 const anhebung = typeof bwp.anhebung_K === 'number' ? bwp.anhebung_K : (bwp.sgready === 3 ? 1.5 : 0);
 const raumSoll = 21 + anhebung;
-const ww = (h >= 6.5 && h < 7) || (h >= 18.5 && h < 19);
+// Warmwasserspeicher: 300 l ≈ 0,35 kWh/K; Zapfen 10 K morgens, 8 K abends (je über 1 h), Verlust 0,5 K/h
+if (!Number.isFinite(s.ww)) s.ww = 48;
+s.ww -= (0.5 + (h >= 6.5 && h < 7.5 ? 10 : 0) + (h >= 18.5 && h < 19.5 ? 8 : 0)) * dtH;
+const wwSoll = bwp.ww_absenken ? 45 : 50;
+if (!s.wwLaeuft && s.ww < wwSoll - 5) s.wwLaeuft = true;          // Vorrang vor der Heizung
+if (s.wwLaeuft && s.ww >= wwSoll) s.wwLaeuft = false;
+const ww = !!s.wwLaeuft;
 let wpW = 0, wpStatus = 'aus';
 if (sim('WP_QUELLE')) {
     if (aussen < 15) {
@@ -69,7 +78,7 @@ if (sim('WP_QUELLE')) {
         if (s.wpLaeuft && s.raum > raumSoll + 0.3) s.wpLaeuft = false;
     } else s.wpLaeuft = false;
     let waerme = 0;
-    if (ww) { wpW = 2200; wpStatus = 'warmwasser'; }
+    if (ww) { wpW = 2200; wpStatus = 'warmwasser'; s.ww += 2.2 * 2.5 / 0.35 * dtH; }
     else if (s.wpLaeuft) { wpW = 1800; wpStatus = 'heizen'; waerme = 1.8 * 3.5; }
     s.raum += (waerme - 0.15 * (s.raum - aussen)) * dtH / 20;
     wpW = Math.round(wpW * (0.95 + zufall() * 0.1));
@@ -127,7 +136,7 @@ if (simBkw) msgs.push({ geraet: 'bkw', quelle: 'simulator', payload: { leistung_
 m('batterie', 'BATTERIE_QUELLE', { soc_pct: +s.soc.toFixed(1), leistung_W: batt, modus });
 m('wallbox', 'WALLBOX_QUELLE', { leistung_W: wbW, status: wbStatus, ampere: wbW ? Math.round(wbW / 230 / phasen) : 0 });
 m('auto', 'AUTO_QUELLE', { soc_pct: +s.autoSoc.toFixed(1) });
-m('wp', 'WP_QUELLE', { leistung_W: wpW, status: wpStatus, raum_C: +s.raum.toFixed(2), aussen_C: aussen });
+m('wp', 'WP_QUELLE', { leistung_W: wpW, status: wpStatus, raum_C: +s.raum.toFixed(2), aussen_C: aussen, ww_C: +s.ww.toFixed(1) });
 m('netz', 'NETZ_QUELLE', { bezug_W: netz }); // zuletzt, damit die Hausbilanz alle Werte dieses Schritts sieht
 node.status({ fill: 'blue', shape: 'dot',
     text: `PV ${pv}${simBkw ? ' + BKW ' + bkw : ''} · Haus ${haus} · WP ${wpW} · Auto ${wbW} (${Math.round(s.autoSoc)} %) · Akku ${batt} (${s.soc.toFixed(0)} %) · Netz ${netz} W` });

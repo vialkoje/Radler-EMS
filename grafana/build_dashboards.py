@@ -209,10 +209,12 @@ def entscheidungen():
     p.append(panel("timeseries", "Wärmepumpe: Anhebung und Überschuss", 0, 23, 12, 8,
                    [q_reihen("ems", "wp_steuerung", {"anhebung_K": "Anhebung"}),
                     q_reihen("ems", "wp_steuerung", {"ueberschuss_W": "Überschuss"}),
-                    q_reihe("geraete", "wp", "raum_C", "Raum")],
+                    q_reihe("geraete", "wp", "raum_C", "Raum"),
+                    q_reihe("geraete", "wp", "ww_C", "Warmwasser")],
                    "kelvin", 1, custom=STUFE, optionen=TS,
                    overrides=[farbe("Überschuss", "yellow", **{"unit": "watt", "custom.axisPlacement": "right"}),
-                              farbe("Raum", "orange", **{"unit": "celsius"})]))
+                              farbe("Raum", "orange", **{"unit": "celsius"}),
+                              farbe("Warmwasser", "red", **{"unit": "celsius", "custom.axisPlacement": "right"})]))
     log_q = ('from(bucket: "ems")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n'
              '  |> filter(fn: (r) => r._measurement == "ems_log")\n  |> group()\n'
              '  |> keep(columns: ["_time", "stufe", "bereich", "_value"])\n'

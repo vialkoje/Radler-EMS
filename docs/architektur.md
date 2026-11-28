@@ -60,7 +60,7 @@ Grenze des Lesers, gilt als fehlend. Die Regel verhält sich dann so, wie ihr Ko
 | `batterie.soc_pct`, `batterie.leistung_W` | leistung **> 0 Entladen, < 0 Laden** | Adapter Batterie |
 | `wallbox.leistung_W`, `wallbox.status`, `wallbox.ampere` | status `getrennt`, `angesteckt`, `laedt`, `pausiert`, `stoerung` | Adapter Wallbox |
 | `auto.soc_pct` | 0–100 | Adapter Auto oder von Hand (`/radler/auto?soc=`) |
-| `wp.leistung_W`, `wp.status`, `wp.aussen_C`, `wp.raum_C` | status `aus`, `heizen`, `warmwasser`, `stoerung` | Adapter WP |
+| `wp.leistung_W`, `wp.status`, `wp.aussen_C`, `wp.raum_C`, `wp.ww_C` | status `aus`, `heizen`, `warmwasser`, `stoerung` | Adapter WP |
 | `haus.verbrauch_W`, `haus.ohne_auto_W`, `haus.grundlast_W` | Bilanz: Netz + PV + Balkonkraftwerk + Batterie (− Auto, − WP) | Prozessabbild, bei jedem Netzwert |
 | `markt.preise`, `markt.preise_15`, `markt.preis_jetzt_ct` | Endpreis in ct/kWh (Börse + `ABGABEN_CT`) | Strompreise |
 | `prognose.pv`, `prognose.pv_anlage`, `prognose.bkw` | `[{ t, W }]` je Stunde (t = Beginn); `pv` = Anlage + Balkonkraftwerk (gekappt auf `BKW_MAX_W`) | PV-Prognose |

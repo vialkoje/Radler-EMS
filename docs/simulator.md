@@ -12,7 +12,8 @@ Hackathon kann man Gerät für Gerät auf echt umstellen.
 | PV | PV-Prognose der laufenden Stunde (Open-Meteo, `PV_FLAECHEN`), zwischen den Stunden interpoliert, × Wolkenfaktor (Zufallsweg 0,5–1,05) |
 | Balkonkraftwerk | nur mit `BKW_QUELLE=simulator`: Prognose der BKW-Flächen (`BKW_FLAECHEN`) × derselbe Wolkenfaktor, höchstens `BKW_MAX_W` |
 | Haus | Grundlast 250 W ± 50 W über den Tag, morgens 6:30–8:30 +400 W, mittags 11:30–13 +500 W, abends 17–22 +600 W, gelegentlich 1,5–3 kW für 1–5 min |
-| Wärmepumpe | Gebäude 20 kWh/K, Verlust 0,15 kW/K; Heizlauf 1,8 kW elektrisch, COP 3,5, Raum 21 °C ± 0,3 K + Anhebung (SG-Ready 3 ohne `anhebung_K`: +1,5 K); Warmwasser 6:30 und 18:30 je 30 min mit 2,2 kW; keine Heizung ab 15 °C außen (aktuelle Außentemperatur aus dem Wetter) |
+| Wärmepumpe | Gebäude 20 kWh/K, Verlust 0,15 kW/K; Heizlauf 1,8 kW elektrisch, COP 3,5, Raum 21 °C ± 0,3 K + Anhebung (SG-Ready 3 ohne `anhebung_K`: +1,5 K); keine Heizung ab 15 °C außen (aktuelle Außentemperatur aus dem Wetter) |
+| Warmwasser | Speicher 300 l (≈ 0,35 kWh/K), Zapfen 10 K morgens 6:30–7:30 und 8 K abends 18:30–19:30, 0,5 K/h Verlust; nachgeheizt mit 2,2 kW (COP 2,5), sobald er 5 K unter dem Sollwert liegt (50 °C, mit `ww_absenken` 45 °C), und unterbricht dafür einen Heizlauf wie eine echte Wärmepumpe; Messwert `wp.ww_C` |
 | Auto | werktags 7:00–17:30 unterwegs, kommt mit 15–25 % weniger zurück; lädt bis 80 % (Ladeziel im Auto); `WB_AKKU_KWH`, 90 % Ladewirkungsgrad |
 | Wallbox | `frei`: `WB_MAX_A` × 230 V × `WB_PHASEN`; `strom`: angegebene Ampere; `pause`: 0 |
 | Batterie | `BATTERIE_KAPAZITAET_WH`, `BATTERIE_MAX_W`, 95 % je Richtung, entlädt nicht unter `BATTERIE_MIN_SOC`; folgt `eigenverbrauch`, `laden`, `begrenzt`; **ohne neuen Befehl nach 5 min zurück in den Eigenverbrauch** (wie ein Gerät mit Timeout) |

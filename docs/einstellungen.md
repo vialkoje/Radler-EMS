@@ -8,8 +8,8 @@ dieser Tabelle. Im Code liest jede Regel ihre Werte mit `env.get('NAME')`.
 
 | Variable | Standard | Bedeutung |
 |---|---|---|
-| `STANDORT_LAT`, `STANDORT_LON` | – (Warnung beim Start) | Koordinaten für Wetter und PV-Prognose |
-| `STANDORT_HOEHE`, `STANDORT_NAME` | – | Höhe in m (genauere Temperatur), Name als Tag `ort` im Wetter |
+| `STANDORT_LAT`, `STANDORT_LON` | Mitte Deutschlands (51,16 / 10,45), mit Warnung beim Start | Koordinaten für Wetter und PV-Prognose |
+| `STANDORT_HOEHE`, `STANDORT_NAME` | –, `Standort` | Höhe in m (genauere Temperatur), Name als Tag `ort` im Wetter |
 | `PV_QUELLE`, `NETZ_QUELLE`, `BATTERIE_QUELLE`, `WALLBOX_QUELLE`, `WP_QUELLE` | `simulator` | `simulator`, `geraet` (Adapter), `aus` (Gerät fehlt, kein Wächter) |
 | `BKW_QUELLE` | `aus` | Balkonkraftwerk: `aus` (nicht vorhanden), `simulator`, `geraet` |
 | `AUTO_QUELLE` | `simulator` | zusätzlich `manuell` (Ladestand über `/radler/auto?soc=`) |
@@ -26,6 +26,7 @@ dieser Tabelle. Im Code liest jede Regel ihre Werte mit `env.get('NAME')`.
 | `WB_MODUS` | `beobachten` | Ladeplanung: `aus`, `beobachten`, `aktiv` |
 | `WB_PV_MODUS` | `aktiv` | PV-Laden: `aus`, `beobachten`, `aktiv` |
 | `WP_MODUS` | `beobachten` | Wärmepumpe: `aus` (0 K), `beobachten`, `aktiv` |
+| `WW_GUENSTIG` | `beobachten` | Warmwasser in günstigen Stunden, siehe unten |
 
 ## Anlage
 
@@ -96,6 +97,8 @@ dieser Tabelle. Im Code liest jede Regel ihre Werte mit `env.get('NAME')`.
 | `RAUM_MAX_C` | `22` | darüber keine Anhebung |
 | `NACHHEIZ_K`, `NACHHEIZ_MIN` | `0.5`, `3` | Heizlauf an Warmwasser anhängen |
 | `WW_NACHT_VON`, `WW_NACHT_BIS` | `1`, `5` | Warmwasser nachts absenken |
+| `WW_GUENSTIG` | `beobachten` | Warmwasser in günstigen Stunden: `aktiv` (sonst abgesenkt), `beobachten` (nur `ww_fenster` protokollieren), `aus` |
+| `WW_GUENSTIG_ANTEIL` | `0.33` | günstig fürs Warmwasser = billigste 33 % der bekannten Stunden außerhalb der Nacht |
 
 ## System und Meldungen
 

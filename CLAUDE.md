@@ -6,6 +6,9 @@
 - Funktionsknoten nur in `nodered/funktionen/*.js` ändern, danach `python3 nodered/build.py`. Nie `flows.json` von Hand.
 - Dashboards nur über `grafana/build_dashboards.py`.
 - Tests: `node --test tests/`. Neue Regeln bekommen einen Test.
+- Jede Änderung bekommt eine Zeile in `docs/aenderungen.md`; was aus Haus-EMS kommt, mit dessen Flow-Stand.
+- Neue Regeln aus Haus-EMS übernehmen: dort nachlesen (`docs/`), hier geräteunabhängig umsetzen (Befehl und Messwerte
+  über die Adapter-Schnittstelle), Standard `beobachten`, Test und Simulator so erweitern, dass die Wirkung sichtbar ist.
 - Keine Zugangsdaten, Adressen, Standorte oder Namen von Personen in Flows, Code oder Doku. Werte gehören in
   `secrets.env` (Vorlage `deploy/secrets.env.example`), im Code nur der Name mit `env.get()`.
 

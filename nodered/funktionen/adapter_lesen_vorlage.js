@@ -12,7 +12,7 @@
 //     batterie: { soc_pct, leistung_W }                          (leistung_W > 0 Entladen, < 0 Laden)
 //     wallbox:  { leistung_W, status, ampere }                   status: getrennt | angesteckt | laedt | pausiert | stoerung
 //     auto:     { soc_pct }                                      (Ladestand des Autos, falls abrufbar)
-//     wp:       { leistung_W, status, aussen_C?, raum_C? }       status: aus | heizen | warmwasser | stoerung
+//     wp:       { leistung_W, status, aussen_C?, raum_C?, ww_C? }  status: aus | heizen | warmwasser | stoerung (ww_C = Warmwasser)
 //
 // Solange <GERÄT>_QUELLE nicht "geraet" ist, tut dieser Knoten nichts.
 

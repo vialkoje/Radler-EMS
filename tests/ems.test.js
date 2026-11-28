@@ -284,3 +284,59 @@ test('Balkonkraftwerk: Simulator nur mit BKW_QUELLE=simulator, Netz rechnet es m
     assert.equal(ohneM.batterie.leistung_W - m.batterie.leistung_W, 800);
 
 });
+
+// ── Warmwasser in günstigen Stunden (aus Haus-EMS flows-34) ──
+const NEUN = '2026-11-25T09:00:00+01:00';
+const PREISE_TAG = [46.5, 48, 50, 52, 52, 50, 49, 48, 47, 46, 45, 45, 46, 47, 48, 47, 30, 30, 30, 30, 46, 50, 52, 50]; // ab 9 Uhr; Index 16–19 = 1–4 Uhr
+function wp(env, preise, extra = {}) {
+    const t = new Date(NEUN).getTime();
+    return lauf('wp_steuerung.js', { jetzt: NEUN, env: Object.assign({ WP_MODUS: 'aktiv' }, env),
+        global: Object.assign({ abbild: abbild(NEUN, { 'wp.status': 'aus', 'wp.leistung_W': 0, 'wetter.temperatur_C': 5 }),
+            ems_live: { frei_W: -500, laden_W: 0, soc: 50, zeit: t },
+            ems_plan: preise ? { zeit: t, preise: stunden(NEUN, preise), pv12h_Wh: 2000 } : undefined }, extra) });
+}
+
+test('Warmwasser: in einer günstigen Stunde normal, die billigen Nachtstunden zählen nicht', () => {
+    // tagsüber liegt die Grenze bei 47 ct (46,5 ist günstig), mit der Nacht läge sie bei 46 ct (nicht günstig)
+    const r = wp({ WW_GUENSTIG: 'aktiv' }, PREISE_TAG);
+    const f = r.ergebnis[1].payload[0].fields;
+    assert.equal(f.ww_fenster, 1);
+    assert.equal(r.ergebnis[0].befehl.ww_absenken, false);
+});
+
+test('Warmwasser: in einer teuren Stunde abgesenkt, mit beobachten nicht', () => {
+    const teuer = [52, ...PREISE_TAG.slice(1)];
+    assert.equal(wp({ WW_GUENSTIG: 'aktiv' }, teuer).ergebnis[0].befehl.ww_absenken, true);
+    const b = wp({}, teuer);                                       // Standard: beobachten
+    assert.equal(b.ergebnis[0].befehl.ww_absenken, false);
+    assert.equal(b.ergebnis[1].payload[0].fields.ww_fenster, 0);
+    assert.equal(b.ergebnis[1].payload[0].fields.ww_guenstig, 'beobachten');
+});
+
+test('Warmwasser: im günstigen Fenster normal, auch während einer Anhebung; ohne Preise wie bisher', () => {
+    const billig = [25, ...PREISE_TAG.slice(1)];                    // günstig fürs Haus (billigstes Viertel) und fürs Warmwasser
+    const r = wp({ WW_GUENSTIG: 'aktiv' }, billig);
+    assert.equal(r.ergebnis[0].befehl.anhebung_K, 2);
+    assert.equal(r.ergebnis[0].befehl.ww_absenken, false);
+    const ohne = wp({ WW_GUENSTIG: 'aktiv' }, null);
+    assert.equal(ohne.ergebnis[1].payload[0].fields.ww_fenster, -1);
+    assert.equal(ohne.ergebnis[0].befehl.ww_absenken, false);       // keine Anhebung, keine Nacht: normal
+});
+
+test('Simulator: Warmwasserspeicher heizt mit ww_absenken erst unter 40 °C nach', () => {
+    const t = new Date('2026-11-25T10:00:00+01:00').getTime();
+    const start = { zeit: t - 10000, wolke: 0.9, soc: 50, raum: 22, wpLaeuft: false, autoSoc: 45, autoDa: true, spitzeBis: 0, spitzeW: 0, ww: 43 };
+    const lauf_ = absenken => lauf('simulator.js', { jetzt: t, env: { SIM_ZUFALL: 'aus' },
+        global: { abbild: { 'wetter.temperatur_C': { wert: 5, zeit: t } }, befehl_wp: { ww_absenken: absenken, anhebung_K: 0, zeit: t } },
+        context: { s: Object.assign({}, start) } });
+    const wpOf = r => r.ergebnis[0].find(m => m.geraet === 'wp').payload;
+    assert.equal(wpOf(lauf_(false)).status, 'warmwasser');          // 43 °C < 50 − 5
+    assert.equal(wpOf(lauf_(true)).status, 'aus');                  // 43 °C > 45 − 5
+});
+
+test('Preise, Prognose, Wetter: eine HTML-Seite statt JSON wird verworfen, ohne Absturz', () => {
+    const html = '<!DOCTYPE html><html>Wartung</html>';
+    assert.equal(lauf('preise.js', { msg: { payload: html, statusCode: 200 } }).ergebnis[0], null);
+    assert.equal(lauf('prognose.js', { msg: { payload: [{ antwort: html, flaeche: { kwp: 5 } }] } }).ergebnis[0], null);
+    assert.equal(lauf('wetter.js', { msg: { payload: html, statusCode: 200 } }).ergebnis, null);
+});
